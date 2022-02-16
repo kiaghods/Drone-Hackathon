@@ -54,14 +54,14 @@ def get_area_indices(area, value, inv=False, obstacle=-1):
 
 class MultiRobotPathPlanner(DARP):
     def __init__(self, nx, ny, notEqualPortions, initial_positions, portions,
-                 obs_pos, visualization, MaxIter=80000, CCvariation=0.01,
-                 randomLevel=0.0001, dcells=2, importance=False):
+                 obs_pos, visualization, poids, MaxIter=80000, CCvariation=0.01,
+                 randomLevel=0.0001, dcells=2, importance=False, tps_affichage = 0.05):
 
         # Initialize DARP
         self.darp_instance = DARP(nx, ny, notEqualPortions, initial_positions, portions, obs_pos, visualization,
                                   MaxIter=MaxIter, CCvariation=CCvariation,
                                   randomLevel=randomLevel, dcells=dcells,
-                                  importance=importance)
+                                  importance=importance, poids = poids, tps_affichage= tps_affichage)
 
         # Divide areas based on robots initial positions
         self.DARP_success , self.iterations = self.darp_instance.divideRegions()
@@ -153,11 +153,13 @@ class MultiRobotPathPlanner(DARP):
 
         # Retrieve number of cells per robot for the configuration with the smaller number of turns
         num_paths = [len(x) for x in AllRealPaths_dict[min_mode]]
+        weight_paths = [x for x in self.darp_instance.ArrayOfElements]
 
         self.returnPaths = AllRealPaths_dict[min_mode]
 
         print(f'\nResults:')
         print(f'Number of cells per robot: {num_paths}')
+        print(f'Weight per robot: {weight_paths}')
         print(f'Minimum number of cells in robots paths: {min(num_paths)}')
         print(f'Maximum number of cells in robots paths: {max(num_paths)}')
         print(f'Average number of cells in robots paths: {np.mean(np.array(num_paths))}')
@@ -222,7 +224,32 @@ if __name__ == '__main__':
         default=False,
         action='store_true',
         help='Visualize results (default: False)')
+    argparser.add_argument(
+        '-iter',
+        default=80000,
+        nargs = '?',
+        type = int,
+        help='maximum number of iterations (default: 80000)')
+    argparser.add_argument(
+        '-weighted_vtx',
+        default=[],
+        nargs='*',
+        type=int,
+        help='Weighted vertexes : cell (default: None), needs to have as many arguments as -vtx_wght')
+    argparser.add_argument(
+        '-vtx_wght',
+        default=[],
+        nargs='*',
+        type=float,
+        help='Weighted vertexes : weight (default: None), needs to have as many arguments as -weighted_vtx')
     args = argparser.parse_args()
 
 
-    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis)
+    if len(args.vtx_wght) != len(args.weighted_vtx):
+        print("You should have as many weighted vertexes as actual weights")
+        sys.exit(2)
+    poids = []
+    for i in range(len(args.vtx_wght)):
+        poids.append((args.weighted_vtx[i], args.vtx_wght[i]))
+
+    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter)
