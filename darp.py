@@ -84,18 +84,26 @@ def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
 
 #Floyd-Warshall pour initialiser les distances entre toutes paires de points, en prenant en compte
 #   les obstacles et les poids
-def distances_ponderees_FW(gridEnv, poids_matrice, rows, cols):
+def distances_ponderees_FW(poids_matrice, rows, cols, obstacles, robots):
+    #On crée GridEnv en avance, mais sans la contrainte qu'elle soit carrée : cela permet de gagner un temps certain
+    #   sur le N^3 imposé par ke Floyd-Warshal
+    smallGrid = np.full((rows, cols), -1)
+    for idx, obstacle_pos in enumerate(obstacles):
+        smallGrid[obstacle_pos[0], obstacle_pos[1]] = -2
+    for idx, robot in enumerate(robots):
+        smallGrid[robot] = idx
+
     V = rows*cols
     dists = np.full((V, V), 2**30)
     for i in range(cols, V):
-        if gridEnv[i//cols, i%cols] == -1:
+        if smallGrid[i//cols, i%cols] == -1:
             dists[i-cols,i] = poids_matrice[i//cols, i%cols]
-        if gridEnv[i//cols-1, i%cols] == -1:
+        if smallGrid[i//cols-1, i%cols] == -1:
             dists[i,i-cols] = poids_matrice[i//cols-1, i%cols]
     for i in range(1, V):
-        if i%cols !=0 and gridEnv[i//cols, i%cols] == -1:
+        if i%cols !=0 and smallGrid[i//cols, i%cols] == -1:
             dists[i-1, i] = poids_matrice[i//cols, i%cols]
-        if i%cols !=0 and gridEnv[(i-1)//cols, (i-1)%cols] == -1:
+        if i%cols !=0 and smallGrid[(i-1)//cols, (i-1)%cols] == -1:
             dists[i, i-1] = poids_matrice[(i-1)//cols, (i-1)%cols]
     for i in range(V):
         dists[i, i] = 0
@@ -142,7 +150,9 @@ class DARP():
         print("Portions for each Robot:", self.portions)
         print("maximum number of iterations:", MaxIter, "\n")
 
-       
+        #on définit les distances avant d'aller tout casser le tableau
+        distances = distances_ponderees_FW(self.poids_matrice, nx, ny, self.obstacles_positions, self.initial_positions)
+
         self.empty_space = []
         if self.rows > self.cols:
             for j in range(self.cols, self.rows):
@@ -155,7 +165,6 @@ class DARP():
                     self.empty_space.append((j, i))
             self.rows = self.cols
 
-
         self.droneNo = len(self.initial_positions)
         self.A = np.zeros((self.rows, self.cols))
         self.defineGridEnv()
@@ -163,7 +172,7 @@ class DARP():
         self.connectivity = np.zeros((self.droneNo, self.rows, self.cols))
         self.BinaryRobotRegions = np.zeros((self.droneNo, self.rows, self.cols), dtype=bool)
 
-        self.AllDistances, self.termThr, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix()
+        self.AllDistances, self.termThr, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix(distances)
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
         self.BWlist = np.zeros((self.droneNo, self.rows, self.cols))
         self.ArrayOfElements = np.zeros(self.droneNo)
@@ -383,7 +392,7 @@ class DARP():
     #Sauf qu'en fait on ne définit pas A, juste les distances aux robots, et encore, sans prendre en compte
     #   les obstacles...
     #On y définit aussi l' "importance comparative" de toute case, en fonction de sa proximité aux robots
-    def construct_Assignment_Matrix(self):
+    def construct_Assignment_Matrix(self, distances):
         Notiles = self.rows*self.cols
         fair_division = 1/self.droneNo
         effectiveSize = 0
@@ -415,14 +424,17 @@ class DARP():
         AllDistances = np.zeros((self.droneNo, self.rows, self.cols))
         TilesImportance = np.zeros((self.droneNo, self.rows, self.cols))
 
-        distances = distances_ponderees_FW(self.GridEnv, self.poids_matrice, self.rows, self.cols)
         for x in range(self.rows):
             for y in range(self.cols):
                 tempSum = 0
                 for r in range(self.droneNo):
                     #les distances prennent maintenant en compte obstacles et poids
                     xr, yr = self.initial_positions[r][0], self.initial_positions[r][1]
-                    AllDistances[r, x, y] = distances[xr*self.cols+yr, self.cols*x+y]
+                    try:
+                        AllDistances[r, x, y] = distances[xr*self.cols+yr, self.cols*x+y]
+                    except:
+                        #donc si on dépasse le tableau des cases initialement existantes
+                        AllDistances[r, x, y] = 2**30
                     if AllDistances[r, x, y] > MaximunDist[r]:
                         MaximunDist[r] = AllDistances[r, x, y]
                     tempSum += AllDistances[r, x, y]
