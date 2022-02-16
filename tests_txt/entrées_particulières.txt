@@ -1,0 +1,2 @@
+python3 from_txt.py -file tests_txt/couloir_avec_bureaux.txt -vis -nep -portions 0.25 0.25 0.25 0.25
+
