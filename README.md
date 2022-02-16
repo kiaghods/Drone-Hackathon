@@ -89,9 +89,32 @@ where o1 o2 and o3 are the positions of the obstacles in the Grid. Obstacle posi
 python3 multiRobotPathPlanner.py -vis
 ```
 
+* To add weights to specific tiles, use
+
+```
+python3 multiRobotPathPlanner.py -weighted_vtx v1 ... vn -vtx_wght w1 ... wn
+```
+
+
+Where v1 to vn are the positions of the weighted vertexes, and w1 ... wn their corresponding weights, as floats.
+
+* To bind a maximum number nb_iter of iteration (default 80 000)
+
+```
+python3 multiRobotPathPlanner.py -iter nb_iter
+```
+
+* To change the time of display of each frame when visualizing
+
+```
+python3 multiRobotPathPlanner.py -show timespan
+```
+
+Where timespan is the desired float
+
 * Demo example:
  
- ```
+```
 python3 multiRobotPathPlanner.py -vis -nep -obs_pos 10 11 12 21 22 23 33 34 35 45 46 47 57 -in_pos 0 99 32 -portions 0.7 0.2 0.1
 ```
 
@@ -100,6 +123,24 @@ python3 multiRobotPathPlanner.py -vis -nep -obs_pos 10 11 12 21 22 23 33 34 35 4
 ```
 nosetests --nocapture mainUnitTest.py
 ```
+
+## Test importation
+
+It is now also possible to import your grid as a txt : it will need to have the following shape
+
+```
+1 1.5 1 # #
+# @ 1 1 @
+# # # 1 1
+1 1 2 1 1
+```
+Where the `@` represent the robots, `#` the obstacles, and the numbers the weighted vertexes (1 being default). Each value in each row needs to be separated by some whitespace, with rows separated by newlines and counting as many elements each.
+
+Such an input can be processed by calling
+```
+python3 from_txt.py -file filename
+```
+(possibly with options - though not the ones relevant to the different objects' positions)
 
 # Results
 
