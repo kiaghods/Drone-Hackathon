@@ -242,6 +242,12 @@ if __name__ == '__main__':
         nargs='*',
         type=float,
         help='Weighted vertexes : weight (default: None), needs to have as many arguments as -weighted_vtx')
+    argparser.add_argument(
+        '-show',
+        default=0.05,
+        nargs = '?',
+        type = float,
+        help='time for each iteration to be shown (default: 0.05)')
     args = argparser.parse_args()
 
 
