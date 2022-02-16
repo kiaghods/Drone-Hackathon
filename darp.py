@@ -106,12 +106,19 @@ def distances_ponderees_FW(poids_matrice, rows, cols, obstacles, robots):
         if i%cols !=0 and smallGrid[(i-1)//cols, (i-1)%cols] == -1:
             dists[i, i-1] = poids_matrice[(i-1)//cols, (i-1)%cols]
     for i in range(V):
-        dists[i, i] = 0
+        if smallGrid[i//cols, i%cols] >= -1:
+            dists[i, i] = 0
+    print("distances bizarres pas à pas, avant calcul :", dists[8*24+9, 7*24+9], dists[7*24+9, 6*24+9], dists[6*24+9, 6*24+10], dists[6*24+10, 6*24+11], dists[6*24+11, 5*24+11])
     for i in range(V):
         for j in range(V):
             for k in range(V):
                 if dists[i,j]>dists[i,k]+dists[k,j]:
                     dists[i,j]=dists[i,k]+dists[k,j]
+    print("distances aux robots de (0,10) :", dists[16,10], dists[4*24+1, 10], dists[8*24+9, 10], dists[8*24+21, 10])
+    print("distances sur un chemin de robot 3 vers (0,10)", dists[8*24+9, 7*24+9], dists[8*24+9, 6*24+9], 
+                        dists[8*24+9, 6*24+10], dists[8*24+9, 6*24+11], dists[8*24+9, 5*24+11], 
+                        dists[8*24+9, 4*24+11], dists[8*24+9, 3*24+11])
+    print("poids de la case bizarre :", poids_matrice[5, 11])
     return dists
 
 
