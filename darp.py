@@ -9,7 +9,6 @@ import time
 import random
 import os
 from numba import njit
-from queue import PriorityQueue
 np.set_printoptions(threshold=sys.maxsize)
 
 random.seed(1)
@@ -83,7 +82,7 @@ def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
 
     return returnM
 
-@njit
+
 def min_unvisited_from_list(list, unvisited):
     index, minima = (-1,-1), 2**30
     rows, cols = len(list), len(list[0])
@@ -96,7 +95,7 @@ def min_unvisited_from_list(list, unvisited):
                     minima = d
     return index, minima
 
-@njit
+
 def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, dist_u, ux, uy):
     if uy != 0:
         alternative_path = dist_u + poids_matrice[ux, uy-1]
@@ -115,7 +114,7 @@ def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, 
         if alternative_path < distances_from_robots[r,ux+1, uy]:
             distances_from_robots[r,ux+1, uy] = alternative_path
 
-@njit
+
 def bad_djikstra(poids_matrice, rows, cols, GridEnv, initial_positions):
     droneNo = len(initial_positions)
     vertexesNo = rows*cols
@@ -453,7 +452,7 @@ class DARP():
             if (DesireableAssign[i] != int(DesireableAssign[i]) and termThr != 1):
                 termThr = 1
 
-        AllDistances = bad_djikstra(self.poids_matrice, self.rows, self.cols, self.GridEnv, self.initial_positions)
+        AllDistances = np.zeros((self.droneNo, self.rows, self.cols))
         TilesImportance = np.zeros((self.droneNo, self.rows, self.cols))
 
 
@@ -461,7 +460,8 @@ class DARP():
             for y in range(self.cols):
                 tempSum = 0
                 for r in range(self.droneNo):
-                    if AllDistances[r, x, y] > MaximunDist[r] and AllDistances[r,x,y]<2**30:
+                    AllDistances[r, x, y] = np.linalg.norm(np.array(self.initial_positions[r]) - np.array((x, y)))  # E!
+                    if AllDistances[r, x, y] > MaximunDist[r]:
                         MaximunDist[r] = AllDistances[r, x, y]
                     tempSum += AllDistances[r, x, y]
 
