@@ -9,16 +9,14 @@ import time
 import random
 import os
 from numba import njit
-from queue import PriorityQueue
 np.set_printoptions(threshold=sys.maxsize)
 
 random.seed(1)
 os.environ['PYTHONHASHSEED'] = str(1)
 np.random.seed(1)
 
-#on crée la matrice d'assignation A, à partir des matrices de distance MetricMatrix[i] = E_i
-#BWlist[i] vaut 1 dans les cases assignées au drone i, 0 sinon
-#ArrayOfElements compte les k_i
+#We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
+#BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
 def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poids_matrice):
     BWlist = np.zeros((droneNo, rows, cols))
@@ -38,14 +36,14 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
 
                 A[i][j] = indMin
                 BWlist[indMin, i, j] = 1
+                #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
                 ArrayOfElements[indMin] += poids_matrice[i,j]
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
     return BWlist, A, ArrayOfElements
 
-#génère, pour le robot commençant en robo_start_point, les matrices binaires des cases qui lui sont
-#   associées - ou inversement
+#generates, for the robot beginning in robo_start_point, the binary assignation values over the grid's cells
 @njit
 def constructBinaryImages(A, robo_start_point, rows, cols):
     BinaryRobot = np.copy(A)
@@ -61,7 +59,6 @@ def constructBinaryImages(A, robo_start_point, rows, cols):
 
     return BinaryRobot, BinaryNonRobot
 
-#dist1 correspond à la distance à la composante connexe initiale, dist2 à la plus proche autre
 @njit
 def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
     returnM = np.zeros((rows, cols))
@@ -76,14 +73,15 @@ def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
             if MinV > returnM[i, j]:
                 MinV = returnM[i, j]
 
-    #On répartit donc les écarts entre 1-CCVariation et 1+CCVariation, de manière proportionnelle
+    #we split proportionnally the differences between 1-CCvariation and 1+CCvariation
     for i in range(rows):
         for j in range(cols):
             returnM[i, j] = (returnM[i, j]-MinV)*((2*CCvariation)/(MaxV - MinV)) + (1-CCvariation)
 
     return returnM
 
-@njit
+#utility for Djikstra, as priority aren't natively implemented in Python (not with the ability to change priorities)
+#   I resorted to using lists instead, as it is only a cost taking place once
 def min_unvisited_from_list(list, unvisited):
     index, minima = (-1,-1), 2**30
     rows, cols = len(list), len(list[0])
@@ -96,7 +94,7 @@ def min_unvisited_from_list(list, unvisited):
                     minima = d
     return index, minima
 
-@njit
+#updating the distances of neighbours in the grid when visiting (x,y) with distance dist_u
 def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, dist_u, ux, uy):
     if uy != 0:
         alternative_path = dist_u + poids_matrice[ux, uy-1]
@@ -115,7 +113,7 @@ def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, 
         if alternative_path < distances_from_robots[r,ux+1, uy]:
             distances_from_robots[r,ux+1, uy] = alternative_path
 
-@njit
+#djikstra's algorithm, except it's implemented with lists instead of priority queues
 def bad_djikstra(poids_matrice, rows, cols, GridEnv, initial_positions):
     droneNo = len(initial_positions)
     vertexesNo = rows*cols
@@ -154,7 +152,7 @@ class DARP():
 
         print("dimensions :", nx, ny)
 
-        
+        #convenience boolean value to accelerate the computation in the uniform case
         self.poids_uniforme = True
         if poids != []:
             self.poids_uniforme = False
@@ -176,7 +174,7 @@ class DARP():
         print("Number of Robots:", len(self.initial_positions))
         print("Initial Robots' positions", self.initial_positions)
         print("Portions for each Robot:", self.portions)
-        print("maximum number of iterations:", MaxIter, "\n")
+        print("maximum number of iterations allowed:", MaxIter, "\n")
 
 
         self.empty_space = []
@@ -211,7 +209,7 @@ class DARP():
         if self.visualization:
             self.assignment_matrix_visualization = darp_area_visualization(self.A, self.droneNo, self.color, self.initial_positions)
 
-    #on vérifie juste qu'aucune des conditions triviales de non-cohérence des entrées n'a lieu
+    #Checking that no trivial incoherent input has been given
     def sanity_check(self, given_initial_positions, given_portions, obs_pos, notEqualPortions, poids):
         
         initial_positions = []
@@ -228,7 +226,7 @@ class DARP():
                 sys.exit(2)
             obstacles_positions.append((obstacle // self.cols, obstacle % self.cols))
 
-        #On vérifie que les positions des poids sont bonnes, et le cas échéant on indique le poids dans son emplacement
+        #Checking similarly that the weights' positions are correct
         poids_positions = []
         for (cell, weight) in poids:
             if cell < 0 or obstacle >= self.rows * self.cols:
@@ -277,7 +275,7 @@ class DARP():
         for x,y,weight in self.poids_positions:
             self.poids_matrice[x,y]=weight
         
-        #zone pas claire, mais a priori ça définit la connectivité des régions
+        #defining regions' connectivity
         mask = np.where(self.GridEnv == -1)
         connectivity[mask[0], mask[1]] = 255
         image = np.uint8(connectivity)
@@ -319,9 +317,8 @@ class DARP():
                                                                    self.poids_matrice)
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
-                #les écarts (en facteur) entre les proportions visées et celles actuellement atteintes
                 plainErrors = np.zeros((self.droneNo))
-                #même chose mais après y avoir soustrait le léger Threshold autorisé
+                #same as plainErrors, but reduced by the eventual allowed threshold
                 divFairError = np.zeros((self.droneNo))
 
                 for r in range(self.droneNo):
@@ -359,7 +356,7 @@ class DARP():
 
                 for r in range(self.droneNo):
                     if totalNegPlainErrors != 0:
-                        # Cette condition me paraît très fausse, on additionne des ratios, donc on est toujours > 0…
+                        # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
                         if divFairError[r] < 0:
                             correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)
                         else:
@@ -372,7 +369,7 @@ class DARP():
                                 correctionMult[r],
                                 divFairError[r] < 0)
 
-                    #La matrice aléatoire introduit des changements très mineurs (par défaut de l'ordre de e-4)
+                    #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
                     self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
                             criterionMatrix,
                             self.generateRandomMatrix(),
@@ -420,10 +417,8 @@ class DARP():
             mask = np.where(self.A == i)
             self.connectivity[i, mask[0], mask[1]] = 255
 
-    # Construct Assignment Matrix
-    #Sauf qu'en fait on ne définit pas A, juste les distances aux robots, et encore, sans prendre en compte
-    #   les obstacles...
-    #On y définit aussi l' "importance comparative" de toute case, en fonction de sa proximité aux robots
+
+    #Defining the distances to robots, as well as the desirable number of tiles for each robot
     def construct_Assignment_Matrix(self):
         Notiles = self.rows*self.cols
         fair_division = 1/self.droneNo
@@ -431,14 +426,14 @@ class DARP():
         if self.poids_uniforme:
             effectiveSize = Notiles - self.droneNo - len(self.obstacles_positions) - len(self.empty_space)
         else:
+            #the desirable assign takes into account the vertices' weights
             for x in range(self.rows):
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
                         effectiveSize += self.poids_matrice[x,y]
         
         termThr = 0
-        #par contre l'assignation de poids arbitraires fait qu'un threshold de 1 peut ne pas convenir
-        #   dans toute situation, typiquement si une zone n'a que des poids dans 2Z
+        #possible issue if the weights are all devisible by 2, for instance
         if effectiveSize % self.droneNo != 0:
             termThr = 1
 

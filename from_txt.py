@@ -2,6 +2,7 @@ from multiRobotPathPlanner import MultiRobotPathPlanner
 import sys
 import argparse
 
+#returns the content of the file as a list of strings, one per line
 def readfile (filename):
     print(filename)
     #filename = sys.argv[0]
@@ -11,7 +12,7 @@ def readfile (filename):
     return strings_input
 
 if __name__ == '__main__':
-
+    #We define again the "other" options, the ones that do not directly appear in the grid
     argparser = argparse.ArgumentParser(
         description=__doc__)
     argparser.add_argument(
@@ -29,7 +30,7 @@ if __name__ == '__main__':
         default="tests_txt/couloir_avec_bureaux.txt",
         nargs = '?',
         type=str,
-        help='File containing the desired input')
+        help='File containing the desired input (default : tests_txt/couloir_avec_bureaux.txt)')
     argparser.add_argument(
         '-vis',
         default=False,
@@ -62,9 +63,10 @@ if __name__ == '__main__':
     for i in range(rows):
         list_tiles = strings_input[i].split()
         if len(list_tiles) != cols:
-            print('pas le même nombre de colonnes partout, la ligne ', i, 'en compte', len(list_tiles))
+            print('Not the same number of items at every line, line ', i, 'has', len(list_tiles), "columns while the 0-th has", cols, "elements")
             sys.exit(1)
 
+        #building the grid parsing through the input txt
         for elt in list_tiles:
             if elt == "@":
                 list_robots.append(current_tile)
@@ -78,8 +80,7 @@ if __name__ == '__main__':
                     print("Not a recognized value at position", current_tile, ": only floats, '@' and '#' accepted, '", elt, "' submitted")
                     sys.exit(3)
             current_tile+=1
-        
-    print("nombre d'obstacles :", len(list_obstacles))
+
 
     MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show)
