@@ -203,6 +203,9 @@ class DARP():
         self.ArrayOfElements = np.zeros(self.droneNo)
         self.color = []
 
+        if not self.poids_uniforme:
+            self.dcells = 2+ self.termThr
+
         for r in range(self.droneNo):
             self.color.append(list(np.random.choice(range(256), size=3)))
 
@@ -354,6 +357,7 @@ class DARP():
 
                     correctionMult[r] = 1
 
+                #old_metric = np.zeros((self.droneNo, self.rows, self.cols))
                 for r in range(self.droneNo):
                     if totalNegPlainErrors != 0:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
@@ -369,12 +373,22 @@ class DARP():
                                 correctionMult[r],
                                 divFairError[r] < 0)
 
+                    #old_metric[r] = self.MetricMatrix[r, :, :]
                     #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
                     self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
                             criterionMatrix,
                             self.generateRandomMatrix(),
                             self.MetricMatrix[r],
                             ConnectedMultiplierList[r, :, :])
+
+                """
+                for r in range(self.droneNo):
+                    for i in range(min(10, self.rows)):
+                        for j in range(self.cols):
+                            if old_metric[r,i,j] != self.MetricMatrix[r,i,j]:
+                                print(r,i,j, " : old = ", old_metric[r,i,j], "new =", self.MetricMatrix[r,i,j])
+                print()
+                """
 
                 iteration += 1
                 if self.visualization:
@@ -401,6 +415,12 @@ class DARP():
 
     def FinalUpdateOnMetricMatrix(self, CM, RM, currentOne, CC):
         MMnew = np.zeros((self.rows, self.cols))
+        """
+        print("current one", currentOne)
+        print("criterion", CM)
+        print("random", RM)
+        print("connected multiplier", CC, "\n")
+        """
         MMnew = currentOne*CM*RM*CC
 
         return MMnew
@@ -426,16 +446,22 @@ class DARP():
         if self.poids_uniforme:
             effectiveSize = Notiles - self.droneNo - len(self.obstacles_positions) - len(self.empty_space)
         else:
+            max_weight = -1
             #the desirable assign takes into account the vertices' weights
             for x in range(self.rows):
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
+                        max_weight = max(max_weight, self.poids_matrice[x,y])
                         effectiveSize += self.poids_matrice[x,y]
         
-        termThr = 0
+        termThr = max_weight
         #possible issue if the weights are all devisible by 2, for instance
         if effectiveSize % self.droneNo != 0:
             termThr = 1
+        if not self.poids_uniforme:
+            print("termThr becomes the maximum weight :", termThr)
+            #Not truly convinced by this solution, 
+            termThr = max_weight
 
         DesireableAssign = np.zeros(self.droneNo)
         MaximunDist = np.zeros(self.droneNo)
