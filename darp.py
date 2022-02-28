@@ -454,7 +454,7 @@ class DARP():
                         max_weight = max(max_weight, self.poids_matrice[x,y])
                         effectiveSize += self.poids_matrice[x,y]
         
-        termThr = max_weight
+        termThr = 0
         #possible issue if the weights are all devisible by 2, for instance
         if effectiveSize % self.droneNo != 0:
             termThr = 1
