@@ -203,6 +203,9 @@ class DARP():
         self.ArrayOfElements = np.zeros(self.droneNo)
         self.color = []
 
+        if not self.poids_uniforme:
+            self.dcells = 2+ self.termThr
+
         for r in range(self.droneNo):
             self.color.append(list(np.random.choice(range(256), size=3)))
 
@@ -426,16 +429,22 @@ class DARP():
         if self.poids_uniforme:
             effectiveSize = Notiles - self.droneNo - len(self.obstacles_positions) - len(self.empty_space)
         else:
+            max_weight = -1
             #the desirable assign takes into account the vertices' weights
             for x in range(self.rows):
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
+                        max_weight = max(max_weight, self.poids_matrice[x,y])
                         effectiveSize += self.poids_matrice[x,y]
         
         termThr = 0
         #possible issue if the weights are all devisible by 2, for instance
         if effectiveSize % self.droneNo != 0:
             termThr = 1
+        if not self.poids_uniforme:
+            print("termThr becomes the maximum weight :", termThr)
+            #Not truly convinced by this solution, 
+            termThr = max_weight
 
         DesireableAssign = np.zeros(self.droneNo)
         MaximunDist = np.zeros(self.droneNo)
