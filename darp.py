@@ -18,12 +18,12 @@ np.random.seed(1)
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
-def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poids_matrice):
-    BWlist = np.zeros((droneNo, rows, cols))
+def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poids_matrice, passage):
+    BWlist = np.zeros((droneNo+1 if passage else droneNo, rows, cols))
     for r in range(droneNo):
         BWlist[r, initial_positions[r][0], initial_positions[r][1]] = 1
 
-    ArrayOfElements = np.zeros(droneNo)
+    ArrayOfElements = np.zeros(droneNo+1 if passage else droneNo)
     for i in range(rows):
         for j in range(cols):
             if GridEnv[i, j] == -1:
@@ -33,11 +33,17 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
                     if MetricMatrix[r, i, j] < minV:
                         minV = MetricMatrix[r, i, j]
                         indMin = r
-
+                weight = poids_matrice[i,j]
+                if weight==0 and MetricMatrix[droneNo, i, j]<minV:
+                    indMin = droneNo
                 A[i][j] = indMin
                 BWlist[indMin, i, j] = 1
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
-                ArrayOfElements[indMin] += poids_matrice[i,j]
+                if weight > 0:
+                    ArrayOfElements[indMin] += weight
+                else:
+                    #when this tile is a passage tile, we want to make the passage taxing
+                    ArrayOfElements[indMin] += 1
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
@@ -145,7 +151,9 @@ class DARP():
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.0001, dcells=2,
-                 importance=False, poids = [], tps_affichage = 0.05):
+                 importance=False, poids = [], tps_affichage = 0.05, given_passage = []):
+                 #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
+                 #  they can be seen as "semi-obstacles"
 
         self.rows = nx
         self.cols = ny
@@ -157,8 +165,20 @@ class DARP():
         if poids != []:
             self.poids_uniforme = False
 
-        self.initial_positions, self.obstacles_positions, self.poids_positions, self.portions = self.sanity_check(given_initial_positions, given_portions, obstacles_positions, notEqualPortions, poids)
+        
 
+        self.initial_positions, self.obstacles_positions, self.poids_positions, self.passage_positions, self.portions = self.sanity_check(given_initial_positions, given_portions, obstacles_positions, notEqualPortions, poids, given_passage)
+
+
+        self.droneNo = len(self.initial_positions)
+        self.passage = False
+        self.noPassage = 0
+        if given_passage != []:
+            self.passage = True
+            self.passageNo = len(given_passage)
+
+        #includes the fake drone linked to passage tiles
+        self.allDrone = self.droneNo+1 if self.passage else self.droneNo
         self.visualization = visualization
         self.MaxIter = MaxIter
         self.CCvariation = CCvariation
@@ -195,25 +215,25 @@ class DARP():
         self.defineGridEnv()
    
         self.connectivity = np.zeros((self.droneNo, self.rows, self.cols))
-        self.BinaryRobotRegions = np.zeros((self.droneNo, self.rows, self.cols), dtype=bool)
+        self.BinaryRobotRegions = np.zeros((self.allDrone, self.rows, self.cols), dtype=bool)
 
         self.AllDistances, self.termThr, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix()
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
-        self.BWlist = np.zeros((self.droneNo, self.rows, self.cols))
-        self.ArrayOfElements = np.zeros(self.droneNo)
+        self.BWlist = np.zeros((self.allDrone, self.rows, self.cols))
+        self.ArrayOfElements = np.zeros(self.allDrone)
         self.color = []
 
         if not self.poids_uniforme:
             self.dcells = 2+ self.termThr
 
-        for r in range(self.droneNo):
+        for r in range(self.allDrone):
             self.color.append(list(np.random.choice(range(256), size=3)))
 
         if self.visualization:
-            self.assignment_matrix_visualization = darp_area_visualization(self.A, self.droneNo, self.color, self.initial_positions)
+            self.assignment_matrix_visualization = darp_area_visualization(self.A, self.allDrone, self.color, self.initial_positions)
 
     #Checking that no trivial incoherent input has been given
-    def sanity_check(self, given_initial_positions, given_portions, obs_pos, notEqualPortions, poids):
+    def sanity_check(self, given_initial_positions, given_portions, obs_pos, notEqualPortions, poids, given_passages):
         
         initial_positions = []
         for position in given_initial_positions:
@@ -229,14 +249,21 @@ class DARP():
                 sys.exit(2)
             obstacles_positions.append((obstacle // self.cols, obstacle % self.cols))
 
+        passage_positions = []
+        for position in given_passages:
+            if position < 0 or position >= self.rows * self.cols:
+                print("Initial positions should be inside the Grid.")
+                sys.exit(1)
+            passage_positions.append((position // self.cols, position % self.cols))
+
         #Checking similarly that the weights' positions are correct
         poids_positions = []
         for (cell, weight) in poids:
             if cell < 0 or obstacle >= self.rows * self.cols:
                 print("Weighted vertexes should be inside the Grid.")
                 sys.exit(6)
-            if weight <= 0:
-                print("Weighted vertexes should have (strictly) positive weight.")
+            if weight < 0:
+                print("Weighted vertexes should have non-negative weight.")
                 sys.exit(7)
             poids_positions.append((cell // self.cols, cell%self.cols, weight))
 
@@ -262,7 +289,13 @@ class DARP():
                     print("Initial positions should not be on obstacles")
                     sys.exit(5)
 
-        return initial_positions, obstacles_positions, poids_positions, portions
+        for position in passage_positions:
+            for obstacle in obstacles_positions:
+                if position[0] == obstacle[0] and position[1] == obstacle[1]:
+                    print("passage tiles should not be on obstacles")
+                    sys.exit(5)
+
+        return initial_positions, obstacles_positions, poids_positions, passage_positions, portions
           
     def defineGridEnv(self):
         self.GridEnv = np.full(shape=(self.rows, self.cols), fill_value=-1)  # create non obstacle map with value -1
@@ -277,6 +310,11 @@ class DARP():
         #adding the weights
         for x,y,weight in self.poids_positions:
             self.poids_matrice[x,y]=weight
+
+        #adding the passage tiles
+        for x,y in self.passage_positions:
+            self.poids_matrice[x,y]=0
+            #We will do tests in the following to ensure that the distance is correctly taken into account
         
         #defining regions' connectivity
         mask = np.where(self.GridEnv == -1)
@@ -300,6 +338,9 @@ class DARP():
         cancelled = False
         criterionMatrix = np.zeros((self.rows, self.cols))
 
+        #as it is supposed to be defined out of the while loop for the last return
+        iteration=0
+
         while self.termThr <= self.dcells and not success and not cancelled:
             downThres = (self.Notiles - self.termThr*(self.droneNo-1))/(self.Notiles*self.droneNo)
             upperThres = (self.Notiles + self.termThr)/(self.Notiles*self.droneNo)
@@ -317,12 +358,14 @@ class DARP():
                                                                    self.GridEnv,
                                                                    self.MetricMatrix,
                                                                    self.A,
-                                                                   self.poids_matrice)
+                                                                   self.poids_matrice,
+                                                                   self.passage)
+                #here however we only look at the droneNo "true" drones, as we have no connectivity constraint on the false one
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
-                plainErrors = np.zeros((self.droneNo))
+                plainErrors = np.zeros((self.allDrone))
                 #same as plainErrors, but reduced by the eventual allowed threshold
-                divFairError = np.zeros((self.droneNo))
+                divFairError = np.zeros((self.allDrone))
 
                 for r in range(self.droneNo):
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
@@ -343,21 +386,28 @@ class DARP():
                     elif plainErrors[r] > upperThres:
                         divFairError[r] = upperThres - plainErrors[r]
 
+                if self.passage:
+                    plainErrors[self.droneNo] = self.ArrayOfElements[self.droneNo]/(self.DesireableAssign[self.droneNo]*self.droneNo)
+                    if plainErrors[self.droneNo] < downThres:
+                        divFairError[self.droneNo] = downThres - plainErrors[self.droneNo]
+                    elif plainErrors[self.droneNo] > upperThres:
+                        divFairError[self.droneNo] = upperThres - plainErrors[self.droneNo]
+
                 if self.IsThisAGoalState(self.termThr, ConnectedRobotRegions):
                     break
 
                 TotalNegPerc = 0
                 totalNegPlainErrors = 0
-                correctionMult = np.zeros(self.droneNo)
+                correctionMult = np.zeros(self.allDrone)
 
-                for r in range(self.droneNo):
+                for r in range(self.allDrone):
                     if divFairError[r] < 0:
                         TotalNegPerc += np.absolute(divFairError[r])
                         totalNegPlainErrors += plainErrors[r]
 
                     correctionMult[r] = 1
 
-                for r in range(self.droneNo):
+                for r in range(self.allDrone):
                     if totalNegPlainErrors != 0:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
                         if divFairError[r] < 0:
@@ -373,11 +423,15 @@ class DARP():
                                 divFairError[r] < 0)
 
                     #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
-                    self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
-                            criterionMatrix,
-                            self.generateRandomMatrix(),
-                            self.MetricMatrix[r],
-                            ConnectedMultiplierList[r, :, :])
+                    if r < self.droneNo:
+                        self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
+                                criterionMatrix,
+                                self.generateRandomMatrix(),
+                                self.MetricMatrix[r],
+                                ConnectedMultiplierList[r, :, :])
+                    else:
+                        randM = self.generateRandomMatrix()
+                        self.MetricMatrix[r] = self.MetricMatrix[r]*criterionMatrix*randM
 
                 iteration += 1
                 if self.visualization:
@@ -412,6 +466,7 @@ class DARP():
         for r in range(self.droneNo):
             if np.absolute(self.DesireableAssign[r] - self.ArrayOfElements[r]) > thresh or not connectedRobotRegions[r]:
                 return False
+        #For the fake drone, we do not add any success condition : we just want it to be here to compete with other drones on passage tiles
         return True
 
     def update_connectivity(self):
@@ -435,6 +490,7 @@ class DARP():
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
                         max_weight = max(max_weight, self.poids_matrice[x,y])
+                        #which allows to not consider passage tiles in our desirable weight
                         effectiveSize += self.poids_matrice[x,y]
         
         termThr = 0
@@ -446,10 +502,10 @@ class DARP():
             #Not truly convinced by this solution, 
             termThr = max_weight
 
-        DesireableAssign = np.zeros(self.droneNo)
-        MaximunDist = np.zeros(self.droneNo)
-        MaximumImportance = np.zeros(self.droneNo)
-        MinimumImportance = np.zeros(self.droneNo)
+        DesireableAssign = np.zeros(self.allDrone)
+        MaximunDist = np.zeros(self.allDrone)
+        MaximumImportance = np.zeros(self.allDrone)
+        MinimumImportance = np.zeros(self.allDrone)
 
         for i in range(self.droneNo):
             DesireableAssign[i] = effectiveSize * self.portions[i]
@@ -457,7 +513,13 @@ class DARP():
             if (DesireableAssign[i] != int(DesireableAssign[i]) and termThr != 1):
                 termThr = 1
 
-        AllDistances = np.zeros((self.droneNo, self.rows, self.cols))
+        if self.passage:
+            #This last desirableAssign won't be restrictive as to accepting an answer, but will
+            #   try to claim passage tiles as its own
+            DesireableAssign[self.droneNo] = self.passageNo
+            MinimumImportance[i] = sys.float_info.max
+
+        AllDistances = np.zeros((self.allDrone, self.rows, self.cols))
         TilesImportance = np.zeros((self.droneNo, self.rows, self.cols))
 
 
@@ -469,6 +531,8 @@ class DARP():
                     if AllDistances[r, x, y] > MaximunDist[r]:
                         MaximunDist[r] = AllDistances[r, x, y]
                     tempSum += AllDistances[r, x, y]
+                if self.passage and self.poids_matrice[x,y] ==0:
+                    AllDistances[self.droneNo, x, y] = 1
 
                 for r in range(self.droneNo):
                     if tempSum - AllDistances[r, x, y] != 0:
@@ -481,6 +545,7 @@ class DARP():
 
                     if TilesImportance[r, x, y] < MinimumImportance[r]:
                         MinimumImportance[r] = TilesImportance[r, x, y]
+                #TODO : importance for the passage case
 
         return AllDistances, termThr, Notiles, DesireableAssign, TilesImportance, MinimumImportance, MaximumImportance
 
