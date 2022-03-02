@@ -44,6 +44,34 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
                 A[i, j] = droneNo
     return A, ArrayOfElements
 
+@njit(fastmath=True)
+def inverse_binary_map_as_uint8(BinaryMap):
+    # cv2.distanceTransform needs input of dtype unit8 (8bit)
+    return np.logical_not(BinaryMap).astype(np.uint8)
+
+@njit(fastmath=True)
+def euclidian_distance_points2d(array1: np.array, array2: np.array) -> np.float_:
+    # this runs much faster than the (numba) np.linalg.norm and is totally enough for our purpose
+    return (
+                   ((array1[0] - array2[0]) ** 2) +
+                   ((array1[1] - array2[1]) ** 2)
+           ) ** 0.5
+
+@njit(fastmath=True)
+def constructBinaryImages(A, robo_start_point, rows, cols):
+    BinaryRobot = np.copy(A)
+    BinaryNonRobot = np.copy(A)
+    for i in range(rows):
+        for j in range(cols):
+            if A[i, j] == A[robo_start_point]:
+                BinaryRobot[i, j] = 1
+                BinaryNonRobot[i, j] = 0
+            elif A[i, j] != 0:
+                BinaryRobot[i, j] = 0
+                BinaryNonRobot[i, j] = 1
+
+    return BinaryRobot, BinaryNonRobot
+
 #generates, for the robot beginning in robo_start_point, the binary assignation values over the grid's cells
 @njit
 def constructBinaryImages(A, robo_start_point, rows, cols):
