@@ -2,13 +2,12 @@ import numpy as np
 import copy
 import sys
 import cv2
-import random
-from scipy import ndimage
 from Visualization import darp_area_visualization
 import time
 import random
 import os
 from numba import njit
+
 np.set_printoptions(threshold=sys.maxsize)
 
 random.seed(1)
@@ -19,9 +18,6 @@ np.random.seed(1)
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
 def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poids_matrice, passage):
-    BWlist = np.zeros((droneNo+1 if passage else droneNo, rows, cols))
-    for r in range(droneNo):
-        BWlist[r, initial_positions[r][0], initial_positions[r][1]] = 1
 
     ArrayOfElements = np.zeros(droneNo+1 if passage else droneNo)
     for i in range(rows):
@@ -37,7 +33,6 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
                 if weight==0 and MetricMatrix[droneNo, i, j]<minV:
                     indMin = droneNo
                 A[i][j] = indMin
-                BWlist[indMin, i, j] = 1
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
                 if weight > 0:
                     ArrayOfElements[indMin] += weight
@@ -47,7 +42,7 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
-    return BWlist, A, ArrayOfElements
+    return A, ArrayOfElements
 
 #generates, for the robot beginning in robo_start_point, the binary assignation values over the grid's cells
 @njit
@@ -65,7 +60,7 @@ def constructBinaryImages(A, robo_start_point, rows, cols):
 
     return BinaryRobot, BinaryNonRobot
 
-#@njit
+@njit(fastmath=True)
 def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
     returnM = np.zeros((rows, cols))
     MaxV = 0
@@ -147,7 +142,7 @@ def bad_djikstra(poids_matrice, rows, cols, GridEnv, initial_positions):
     return distances_from_robots
 
 
-class DARP():
+class DARP:
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.0001, dcells=2,
@@ -222,7 +217,6 @@ class DARP():
 
         self.AllDistances, self.termThr, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix()
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
-        self.BWlist = np.zeros((self.allDrone, self.rows, self.cols))
         self.ArrayOfElements = np.zeros(self.allDrone)
         self.color = []
 
@@ -230,8 +224,10 @@ class DARP():
             self.dcells = 2+ self.termThr
 
         for r in range(self.allDrone):
+            np.random.seed(r)
             self.color.append(list(np.random.choice(range(256), size=3)))
-
+        
+        np.random.seed(1)
         if self.visualization:
             self.assignment_matrix_visualization = darp_area_visualization(self.A, self.droneNo, self.color, self.initial_positions)
 
@@ -340,6 +336,7 @@ class DARP():
         success = False
         cancelled = False
         criterionMatrix = np.zeros((self.rows, self.cols))
+        iteration = 0
 
         #as it is supposed to be defined out of the while loop for the last return
         iteration=0
@@ -351,14 +348,12 @@ class DARP():
             success = True
 
             # Main optimization loop
-            iteration = 0
 
             while iteration <= self.MaxIter and not cancelled:
                 print("iteration beginning")
                 self.BWlist, self.A, self.ArrayOfElements = assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
-                                                                   self.initial_positions,
                                                                    self.GridEnv,
                                                                    self.MetricMatrix,
                                                                    self.A,
@@ -535,7 +530,7 @@ class DARP():
             for y in range(self.cols):
                 tempSum = 0
                 for r in range(self.droneNo):
-                    AllDistances[r, x, y] = np.linalg.norm(np.array(self.initial_positions[r]) - np.array((x, y)))  # E!
+                    AllDistances[r, x, y] = euclidian_distance_points2d(np.array(self.initial_positions[r]), np.array((x, y))) # E!
                     if AllDistances[r, x, y] > MaximunDist[r]:
                         MaximunDist[r] = AllDistances[r, x, y]
                     tempSum += AllDistances[r, x, y]
@@ -571,9 +566,9 @@ class DARP():
 
     def NormalizedEuclideanDistanceBinary(self, RobotR, BinaryRobot, BinaryNonRobot):
         if RobotR:
-            distRobot = ndimage.morphology.distance_transform_edt(np.logical_not(BinaryRobot))
+            distRobot = cv2.distanceTransform(inverse_binary_map_as_uint8(BinaryRobot), distanceType=2, maskSize=0, dstType=5)
         else:
-            distRobot = ndimage.morphology.distance_transform_edt(np.logical_not(BinaryNonRobot))
+            distRobot = cv2.distanceTransform(inverse_binary_map_as_uint8(BinaryNonRobot), distanceType=2, maskSize=0, dstType=5)
 
         MaxV = np.max(distRobot)
         MinV = np.min(distRobot)
