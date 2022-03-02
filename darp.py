@@ -65,7 +65,7 @@ def constructBinaryImages(A, robo_start_point, rows, cols):
 
     return BinaryRobot, BinaryNonRobot
 
-@njit
+#@njit
 def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
     returnM = np.zeros((rows, cols))
     MaxV = 0
@@ -167,12 +167,13 @@ class DARP():
 
         
 
-        self.initial_positions, self.obstacles_positions, self.poids_positions, self.passage_positions, self.portions = self.sanity_check(given_initial_positions, given_portions, obstacles_positions, notEqualPortions, poids, given_passage)
+        self.initial_positions, self.obstacles_positions, self.poids_positions, self.passage_positions, self.portions = self.sanity_check(given_initial_positions, given_portions, obstacles_positions,
+                                                                                                                                         notEqualPortions, poids, given_passage)
 
 
         self.droneNo = len(self.initial_positions)
         self.passage = False
-        self.noPassage = 0
+        self.PassageNo = 0
         if given_passage != []:
             self.passage = True
             self.passageNo = len(given_passage)
@@ -192,6 +193,8 @@ class DARP():
         print("\nInitial Conditions Defined:")
         print("Grid Dimensions:", nx, ny)
         print("Number of Robots:", len(self.initial_positions))
+        if self.passage:
+            print("with the presence of an additional false robot")
         print("Initial Robots' positions", self.initial_positions)
         print("Portions for each Robot:", self.portions)
         print("maximum number of iterations allowed:", MaxIter, "\n")
@@ -230,7 +233,7 @@ class DARP():
             self.color.append(list(np.random.choice(range(256), size=3)))
 
         if self.visualization:
-            self.assignment_matrix_visualization = darp_area_visualization(self.A, self.allDrone, self.color, self.initial_positions)
+            self.assignment_matrix_visualization = darp_area_visualization(self.A, self.droneNo, self.color, self.initial_positions)
 
     #Checking that no trivial incoherent input has been given
     def sanity_check(self, given_initial_positions, given_portions, obs_pos, notEqualPortions, poids, given_passages):
@@ -351,6 +354,7 @@ class DARP():
             iteration = 0
 
             while iteration <= self.MaxIter and not cancelled:
+                print("iteration beginning")
                 self.BWlist, self.A, self.ArrayOfElements = assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
@@ -360,12 +364,14 @@ class DARP():
                                                                    self.A,
                                                                    self.poids_matrice,
                                                                    self.passage)
+                print("assignment done")
                 #here however we only look at the droneNo "true" drones, as we have no connectivity constraint on the false one
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
                 plainErrors = np.zeros((self.allDrone))
                 #same as plainErrors, but reduced by the eventual allowed threshold
                 divFairError = np.zeros((self.allDrone))
+                print("errors evaluated")
 
                 for r in range(self.droneNo):
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
@@ -385,7 +391,7 @@ class DARP():
                         divFairError[r] = downThres - plainErrors[r]
                     elif plainErrors[r] > upperThres:
                         divFairError[r] = upperThres - plainErrors[r]
-
+                print("connectedness computed")
                 if self.passage:
                     plainErrors[self.droneNo] = self.ArrayOfElements[self.droneNo]/(self.DesireableAssign[self.droneNo]*self.droneNo)
                     if plainErrors[self.droneNo] < downThres:
@@ -395,6 +401,7 @@ class DARP():
 
                 if self.IsThisAGoalState(self.termThr, ConnectedRobotRegions):
                     break
+                print("goal state checked")
 
                 TotalNegPerc = 0
                 totalNegPlainErrors = 0
@@ -431,13 +438,14 @@ class DARP():
                                 ConnectedMultiplierList[r, :, :])
                     else:
                         randM = self.generateRandomMatrix()
-                        self.MetricMatrix[r] = self.MetricMatrix[r]*criterionMatrix*randM
-
+                        decaying_factor = 1.2* np.eye(self.rows)
+                        self.MetricMatrix[r] = decaying_factor * self.MetricMatrix[r]*criterionMatrix*randM
+                print("metric matrix computed")
                 iteration += 1
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
-
+                print("visualization done")
             if iteration >= self.MaxIter:
                 self.MaxIter = self.MaxIter/2
                 success = False
@@ -520,7 +528,7 @@ class DARP():
             MinimumImportance[i] = sys.float_info.max
 
         AllDistances = np.zeros((self.allDrone, self.rows, self.cols))
-        TilesImportance = np.zeros((self.droneNo, self.rows, self.cols))
+        TilesImportance = np.zeros((self.allDrone, self.rows, self.cols))
 
 
         for x in range(self.rows):
