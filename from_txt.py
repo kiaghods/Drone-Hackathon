@@ -56,6 +56,7 @@ if __name__ == '__main__':
     list_robots = []
     list_obstacles = []
     list_poids = []
+    list_passage = []
 
     cols = len(strings_input[0].split())
     current_tile = 0
@@ -74,6 +75,8 @@ if __name__ == '__main__':
                 list_obstacles.append(current_tile)
             else:
                 try : 
+                    if float(elt) == 0:
+                        list_passage.append(current_tile)
                     if float(elt) != 1:
                         list_poids.append((current_tile, float(elt)))
                 except :
@@ -83,4 +86,5 @@ if __name__ == '__main__':
 
 
     MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
-                                                list_poids, MaxIter=args.iter, tps_affichage=args.show)
+                                                list_poids, MaxIter=args.iter, tps_affichage=args.show,
+                                                passage=list_passage)

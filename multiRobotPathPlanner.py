@@ -55,13 +55,13 @@ def get_area_indices(area, value, inv=False, obstacle=-1):
 class MultiRobotPathPlanner(DARP):
     def __init__(self, nx, ny, notEqualPortions, initial_positions, portions,
                  obs_pos, visualization, poids, MaxIter=80000, CCvariation=0.06,
-                 randomLevel=0.0001, dcells=2, importance=False, tps_affichage = 0.05):
+                 randomLevel=0.0001, dcells=2, importance=False, tps_affichage = 0.05, passage = []):
 
         # Initialize DARP
         self.darp_instance = DARP(nx, ny, notEqualPortions, initial_positions, portions, obs_pos, visualization,
                                   MaxIter=MaxIter, CCvariation=CCvariation,
                                   randomLevel=randomLevel, dcells=dcells,
-                                  importance=importance, poids = poids, tps_affichage= tps_affichage)
+                                  importance=importance, poids = poids, tps_affichage= tps_affichage, given_passage=passage)
 
         # Divide areas based on robots initial positions
         self.DARP_success , self.iterations = self.darp_instance.divideRegions()
@@ -210,6 +210,12 @@ if __name__ == '__main__':
         type=int,
         help='Initial Positions of the robots (default: (1, 3, 9))')
     argparser.add_argument(
+        '-pas_pos',
+        default=[],
+        nargs='*',
+        type=int,
+        help='Passage tiles positions (default: (1, 3, 9))')
+    argparser.add_argument(
         '-nep',
         action='store_true',
         help='Not Equal Portions shared between the Robots in the Grid (default: False)')
@@ -258,4 +264,4 @@ if __name__ == '__main__':
     for i in range(len(args.vtx_wght)):
         poids.append((args.weighted_vtx[i], args.vtx_wght[i]))
 
-    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter)
+    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter, passage=args.pas_pos)
