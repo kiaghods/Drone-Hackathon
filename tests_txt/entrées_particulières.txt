@@ -1,2 +1,0 @@
-python3 from_txt.py -file tests_txt/couloir_avec_bureaux.txt -vis -nep -portions 0.25 0.25 0.25 0.25 -iter 10000 -show 0
-La convergence ne semble pas aboutir, mince. Vérifier si je n'ai pas cassé DARP
