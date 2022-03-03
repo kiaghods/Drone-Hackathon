@@ -30,7 +30,7 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
                         minV = MetricMatrix[r, i, j]
                         indMin = r
                 weight = poids_matrice[i,j]
-                if weight==0 and MetricMatrix[droneNo, i, j]<minV:
+                if weight<0 and MetricMatrix[droneNo, i, j]<minV:
                     indMin = droneNo
                 A[i][j] = indMin
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
@@ -38,7 +38,7 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
                     ArrayOfElements[indMin] += weight
                 else:
                     #when this tile is a passage tile, we want to make the passage taxing
-                    ArrayOfElements[indMin] += 1
+                    ArrayOfElements[indMin] -= weight
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
@@ -206,7 +206,7 @@ class DARP:
             self.dcells = dcells_weight
             #There's the slight issue if you want dcells to be EXACTLY 2 despiste weights, but well, you can always put 2.01 then
 
-        print("The minimum threshold is", self.termThr, "and it will go up to", self.termThr+self.dcells)
+        print("The minimum deviation is", self.termThr, "and it will go up to", self.termThr+self.dcells)
 
         for r in range(self.allDrone):
             np.random.seed(r)
@@ -246,8 +246,8 @@ class DARP:
             if cell < 0 or obstacle >= self.rows * self.cols:
                 print("Weighted vertexes should be inside the Grid.")
                 sys.exit(6)
-            if weight < 0:
-                print("Weighted vertexes should have non-negative weight.")
+            if weight == 0:
+                print("Weighted vertexes should have non-null weight.")
                 sys.exit(7)
             poids_positions.append((cell // self.cols, cell%self.cols, weight))
 
@@ -322,9 +322,6 @@ class DARP:
         cancelled = False
         criterionMatrix = np.zeros((self.rows, self.cols))
         iteration = 0
-
-        if self.passage:
-            print(self.MetricMatrix[self.droneNo], "\n")
 
         #as it is supposed to be defined out of the while loop for the last return
         iteration=0
@@ -478,10 +475,12 @@ class DARP:
             for x in range(self.rows):
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
-                        max_weight = max(max_weight, self.poids_matrice[x,y])
-                        min_weight = min(min_weight, self.poids_matrice[x,y])
-                        #which allows to not consider passage tiles in our desirable weight
-                        effectiveSize += self.poids_matrice[x,y]
+                        weight = self.poids_matrice[x,y]
+                        max_weight = max(max_weight, weight)
+                        min_weight = min(min_weight, weight)
+                        if weight >0:
+                            #which allows to not consider passage tiles in our desirable weight
+                            effectiveSize += weight
         
         termThr = 0
         dcells =2
@@ -521,7 +520,7 @@ class DARP:
                     if AllDistances[r, x, y] > MaximunDist[r]:
                         MaximunDist[r] = AllDistances[r, x, y]
                     tempSum += AllDistances[r, x, y]
-                if self.passage and self.poids_matrice[x,y] ==0:
+                if self.passage and self.poids_matrice[x,y] <0:
                     AllDistances[self.droneNo, x, y] = 1
 
                 for r in range(self.droneNo):
