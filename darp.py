@@ -197,13 +197,16 @@ class DARP:
         self.connectivity = np.zeros((self.droneNo, self.rows, self.cols))
         self.BinaryRobotRegions = np.zeros((self.allDrone, self.rows, self.cols), dtype=bool)
 
-        self.AllDistances, self.termThr, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix()
+        self.AllDistances, self.termThr, dcells_weight, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix()
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
         self.ArrayOfElements = np.zeros(self.allDrone)
         self.color = []
 
-        if not self.poids_uniforme:
-            self.dcells = 2+ self.termThr
+        if self.dcells ==2: #that is, the default value
+            self.dcells = dcells_weight
+            #There's the slight issue if you want dcells to be EXACTLY 2 despiste weights, but well, you can always put 2.01 then
+
+        print("The minimum threshold is", self.termThr, "and it will go up to", self.termThr+self.dcells)
 
         for r in range(self.allDrone):
             np.random.seed(r)
@@ -470,22 +473,24 @@ class DARP:
             effectiveSize = Notiles - self.droneNo - len(self.obstacles_positions) - len(self.empty_space)
         else:
             max_weight = -1
+            min_weight = 2**30
             #the desirable assign takes into account the vertices' weights
             for x in range(self.rows):
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
                         max_weight = max(max_weight, self.poids_matrice[x,y])
+                        min_weight = min(min_weight, self.poids_matrice[x,y])
                         #which allows to not consider passage tiles in our desirable weight
                         effectiveSize += self.poids_matrice[x,y]
         
         termThr = 0
+        dcells =2
         #possible issue if the weights are all devisible by 2, for instance
         if effectiveSize % self.droneNo != 0:
             termThr = 1
         if not self.poids_uniforme:
-            print("termThr becomes the maximum weight :", termThr)
-            #Not truly convinced by this solution, 
-            termThr = max_weight
+            termThr = min_weight
+            dcells = max_weight + self.passageNo // self.droneNo
 
         DesireableAssign = np.zeros(self.allDrone)
         MaximunDist = np.zeros(self.allDrone)
@@ -532,7 +537,7 @@ class DARP:
                         MinimumImportance[r] = TilesImportance[r, x, y]
                 #TODO : importance for the passage case
 
-        return AllDistances, termThr, Notiles, DesireableAssign, TilesImportance, MinimumImportance, MaximumImportance
+        return AllDistances, termThr, dcells, Notiles, DesireableAssign, TilesImportance, MinimumImportance, MaximumImportance
 
     def calculateCriterionMatrix(self, TilesImportance, MinimumImportance, MaximumImportance, correctionMult, smallerthan_zero,):
         returnCrit = np.zeros((self.rows, self.cols))
