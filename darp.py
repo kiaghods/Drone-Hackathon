@@ -123,52 +123,6 @@ def min_unvisited_from_list(list, unvisited):
                     minima = d
     return index, minima
 
-#updating the distances of neighbours in the grid when visiting (x,y) with distance dist_u
-def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, dist_u, ux, uy):
-    if uy != 0:
-        alternative_path = dist_u + poids_matrice[ux, uy-1]
-        if alternative_path < distances_from_robots[r,ux, uy-1]:
-            distances_from_robots[r,ux, uy-1] = alternative_path
-    if uy != cols-1:
-        alternative_path = dist_u + poids_matrice[ux, uy+1]
-        if alternative_path < distances_from_robots[r,ux, uy+1]:
-            distances_from_robots[r,ux, uy+1] = alternative_path
-    if ux != 0:
-        alternative_path = dist_u + poids_matrice[ux-1, uy]
-        if alternative_path < distances_from_robots[r,ux-1, uy]:
-            distances_from_robots[r,ux-1, uy] = alternative_path
-    if ux != rows-1:
-        alternative_path = dist_u + poids_matrice[ux+1, uy]
-        if alternative_path < distances_from_robots[r,ux+1, uy]:
-            distances_from_robots[r,ux+1, uy] = alternative_path
-
-#djikstra's algorithm, except it's implemented with lists instead of priority queues
-def bad_djikstra(poids_matrice, rows, cols, GridEnv, initial_positions):
-    droneNo = len(initial_positions)
-    vertexesNo = rows*cols
-    distances_from_robots = np.full((droneNo, rows, cols), 2**30)
-
-    for idx, (x,y) in enumerate(initial_positions):
-        distances_from_robots[idx,x,y] = 0
-    
-    for r in range(droneNo):
-        rx, ry = initial_positions[r][0], initial_positions[r][1]
-        unvisited_set = np.full((rows, cols), True)
-        unvisited_set[rx, ry] = 0
-
-        ux, uy, dist_u = rx, ry, 0
-        
-        while not ux==-1:
-            #we mark that vertex as visited
-            unvisited_set[ux, uy]=False
-            #We can leave from any empty tile or from ourself, but not from obstacles nor from other robots
-            if GridEnv[ux, uy]== -1 or GridEnv[ux, uy]==r:
-                #We thus enumerate our (possible) neighbours
-                exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, dist_u, ux, uy)
-
-            (ux, uy), dist_u = min_unvisited_from_list(distances_from_robots[r], unvisited_set)
-    return distances_from_robots
-
 
 class DARP:
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
@@ -366,6 +320,9 @@ class DARP:
         criterionMatrix = np.zeros((self.rows, self.cols))
         iteration = 0
 
+        if self.passage:
+            print(self.MetricMatrix[self.droneNo], "\n")
+
         #as it is supposed to be defined out of the while loop for the last return
         iteration=0
 
@@ -377,24 +334,24 @@ class DARP:
 
             # Main optimization loop
 
+            iteration=0
+
             while iteration <= self.MaxIter and not cancelled:
-                print("iteration beginning")
-                self.BWlist, self.A, self.ArrayOfElements = assign(self.droneNo,
+                self.A, self.ArrayOfElements = assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
+                                                                   self.initial_positions,
                                                                    self.GridEnv,
                                                                    self.MetricMatrix,
                                                                    self.A,
                                                                    self.poids_matrice,
                                                                    self.passage)
-                print("assignment done")
                 #here however we only look at the droneNo "true" drones, as we have no connectivity constraint on the false one
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
                 plainErrors = np.zeros((self.allDrone))
                 #same as plainErrors, but reduced by the eventual allowed threshold
                 divFairError = np.zeros((self.allDrone))
-                print("errors evaluated")
 
                 for r in range(self.droneNo):
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
@@ -414,7 +371,6 @@ class DARP:
                         divFairError[r] = downThres - plainErrors[r]
                     elif plainErrors[r] > upperThres:
                         divFairError[r] = upperThres - plainErrors[r]
-                print("connectedness computed")
                 if self.passage:
                     plainErrors[self.droneNo] = self.ArrayOfElements[self.droneNo]/(self.DesireableAssign[self.droneNo]*self.droneNo)
                     if plainErrors[self.droneNo] < downThres:
@@ -424,7 +380,6 @@ class DARP:
 
                 if self.IsThisAGoalState(self.termThr, ConnectedRobotRegions):
                     break
-                print("goal state checked")
 
                 TotalNegPerc = 0
                 totalNegPlainErrors = 0
@@ -461,14 +416,13 @@ class DARP:
                                 ConnectedMultiplierList[r, :, :])
                     else:
                         randM = self.generateRandomMatrix()
-                        decaying_factor = 1.2* np.eye(self.rows)
-                        self.MetricMatrix[r] = decaying_factor * self.MetricMatrix[r]*criterionMatrix*randM
-                print("metric matrix computed")
+                        self.MetricMatrix[r] = 1.0095* self.MetricMatrix[r]*criterionMatrix*randM
+                        #TODO : facteur correctif à rendre plus fiable
                 iteration += 1
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
-                print("visualization done")
+
             if iteration >= self.MaxIter:
                 self.MaxIter = self.MaxIter/2
                 success = False
