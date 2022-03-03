@@ -234,11 +234,11 @@ class DARP:
             obstacles_positions.append((obstacle // self.cols, obstacle % self.cols))
 
         passage_positions = []
-        for position in given_passages:
+        for (position, weight) in given_passages:
             if position < 0 or position >= self.rows * self.cols:
                 print("Initial positions should be inside the Grid.")
                 sys.exit(1)
-            passage_positions.append((position // self.cols, position % self.cols))
+            passage_positions.append((position // self.cols, position % self.cols, weight))
 
         #Checking similarly that the weights' positions are correct
         poids_positions = []
@@ -296,9 +296,8 @@ class DARP:
             self.poids_matrice[x,y]=weight
 
         #adding the passage tiles
-        for x,y in self.passage_positions:
-            self.poids_matrice[x,y]=0
-            #We will do tests in the following to ensure that the distance is correctly taken into account
+        for x,y, weight in self.passage_positions:
+            self.poids_matrice[x,y]= -weight
         
         #defining regions' connectivity
         mask = np.where(self.GridEnv == -1)
@@ -428,6 +427,7 @@ class DARP:
                 success = False
                 self.termThr += 1
 
+        print("success with a deviation of", self.termThr)
         self.getBinaryRobotRegions()
         return success, iteration
 
@@ -466,6 +466,7 @@ class DARP:
         Notiles = self.rows*self.cols
         fair_division = 1/self.droneNo
         effectiveSize = 0
+        total_passage_weight= 0
         if self.poids_uniforme:
             effectiveSize = Notiles - self.droneNo - len(self.obstacles_positions) - len(self.empty_space)
         else:
@@ -476,11 +477,14 @@ class DARP:
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
                         weight = self.poids_matrice[x,y]
-                        max_weight = max(max_weight, weight)
-                        min_weight = min(min_weight, weight)
+                        max_weight = max(max_weight, abs(weight))
+                        min_weight = min(min_weight, abs(weight))
                         if weight >0:
                             #which allows to not consider passage tiles in our desirable weight
                             effectiveSize += weight
+                        else:
+                            total_passage_weight += weight
+        print("effective size :", effectiveSize)
         
         termThr = 0
         dcells =2
@@ -489,7 +493,7 @@ class DARP:
             termThr = 1
         if not self.poids_uniforme:
             termThr = min_weight
-            dcells = max_weight + self.passageNo // self.droneNo
+            dcells = max_weight - total_passage_weight // self.droneNo
 
         DesireableAssign = np.zeros(self.allDrone)
         MaximunDist = np.zeros(self.allDrone)
