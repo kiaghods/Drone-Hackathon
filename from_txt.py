@@ -73,17 +73,19 @@ if __name__ == '__main__':
                 list_robots.append(current_tile)
             elif elt == "#":
                 list_obstacles.append(current_tile)
-            else:
+            elif elt[0] == "-":
                 try : 
-                    if float(elt) == 0:
-                        list_passage.append(current_tile)
-                    if float(elt) != 1:
-                        list_poids.append((current_tile, float(elt)))
+                    list_passage.append((current_tile, float(elt[1:])))
+                except :
+                    print("Not a recognized value at position", current_tile, ":", elt[1:], "where a float is expected after '-'")
+                    sys.exit(3)
+            else:
+                try :
+                   list_poids.append((current_tile, float(elt)))
                 except :
                     print("Not a recognized value at position", current_tile, ": only floats, '@' and '#' accepted, '", elt, "' submitted")
                     sys.exit(3)
             current_tile+=1
-
 
     MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
