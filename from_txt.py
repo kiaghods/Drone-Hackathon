@@ -48,6 +48,12 @@ if __name__ == '__main__':
         nargs = '?',
         type = float,
         help='time for each iteration to be shown (default: 0.05)')
+    argparser.add_argument(
+        '-slow',
+        default=8,
+        nargs = '?',
+        type = int,
+        help='the power of 10 by which the gradient step will reduce every 30 iterations (default: 8)')
     args = argparser.parse_args()
     
     strings_input = readfile(args.file)
@@ -88,5 +94,9 @@ if __name__ == '__main__':
             current_tile+=1
 
     MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
+<<<<<<< HEAD
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
                                                 passage=list_passage)
+=======
+                                        list_poids, MaxIter=args.iter, tps_affichage=args.show, reduction_step_power=args.slow)
+>>>>>>> main

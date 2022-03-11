@@ -56,14 +56,16 @@ def get_area_indices(area, value, inv=False, obstacle=-1):
 class MultiRobotPathPlanner(DARP):
     def __init__(self, nx, ny, notEqualPortions, initial_positions, portions,
                  obs_pos, visualization, poids, MaxIter=80000, CCvariation=0.06,
-                 randomLevel=0.0001, dcells=2, importance=False, tps_affichage = 0.05, passage = []):
+                 randomLevel=0.0001, dcells=2, importance=False, tps_affichage = 0.05, passage = [],
+                 reduction_step_power = 8):
 
         start_time = time.time()
         # Initialize DARP
         self.darp_instance = DARP(nx, ny, notEqualPortions, initial_positions, portions, obs_pos, visualization,
                                   MaxIter=MaxIter, CCvariation=CCvariation,
                                   randomLevel=randomLevel, dcells=dcells,
-                                  importance=importance, poids = poids, tps_affichage= tps_affichage, given_passage=passage)
+                                  importance=importance, poids = poids, tps_affichage= tps_affichage, given_passage=passage,
+                                  reduction_step_power = reduction_step_power)
 
         # Divide areas based on robots initial positions
         self.DARP_success , self.iterations = self.darp_instance.divideRegions()
@@ -287,6 +289,12 @@ if __name__ == '__main__':
         nargs = '?',
         type = float,
         help='time for each iteration to be shown (default: 0.05)')
+    argparser.add_argument(
+        '-slow',
+        default=8,
+        nargs = '?',
+        type = int,
+        help='the power of 10 by which the gradient step will reduce every 30 iterations (default: 8)')
     args = argparser.parse_args()
 
 
@@ -297,4 +305,4 @@ if __name__ == '__main__':
     for i in range(len(args.vtx_wght)):
         poids.append((args.weighted_vtx[i], args.vtx_wght[i]))
 
-    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter, passage=args.pas_pos)
+    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter, passage=args.pas_pos, reduction_step_power=args.slow)
