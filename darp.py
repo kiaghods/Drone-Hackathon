@@ -108,7 +108,6 @@ def ConnectedComponentWarpDistance(num_labels, labels_im, poids_matrice, r_posit
                 tab_coeffs[label+1] = max_coeff * ((weights[label]**3)/(max_weight**3))
     return tab_coeffs, total_weight, connected
 
-<<<<<<< HEAD
 #utility for Djikstra, as priority aren't natively implemented in Python (not with the ability to change priorities)
 #   I resorted to using lists instead, as it is only a cost taking place once
 def min_unvisited_from_dict(distances, unvisited_passages):
@@ -183,21 +182,15 @@ def WarpDistanceToRegion(labels_im, poids_matrice, passage_positions, initial_po
         (ux, uy), dist_u = min_unvisited_from_dict(distances_from_robot, unvisited_set)
 
     return distances_from_robot
-=======
->>>>>>> main
 
 
 class DARP:
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.0001, dcells=2,
-<<<<<<< HEAD
-                 importance=False, poids = [], tps_affichage = 0.05, given_passage = []):
+                 importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step_power = 8):
                  #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
                  #  they can be seen as "semi-obstacles"
-=======
-                 importance=False, poids = [], tps_affichage = 0.05, reduction_step_power = 8):
->>>>>>> main
 
         self.rows = nx
         self.cols = ny
@@ -388,15 +381,10 @@ class DARP:
         success = False
         cancelled = False
         criterionMatrix = np.zeros((self.rows, self.cols))
-<<<<<<< HEAD
         total_iteration = 0
 
         #as it is supposed to be defined out of the while loop for the last return
         iteration=0
-=======
-        iteration = 0
-        total_iteration=0
->>>>>>> main
 
         while self.termThr <= self.dcells and not success and not cancelled:
             downThres = (self.Notiles - self.termThr*(self.droneNo-1))/(self.Notiles*self.droneNo)
@@ -435,13 +423,9 @@ class DARP:
                         BinaryRobot, BinaryNonRobot = constructBinaryImages(labels_im, self.initial_positions[r], self.rows, self.cols)
                         ConnectedMultiplier, added_weight, connected = self.CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
-<<<<<<< HEAD
-                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation,
+                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation*self.current_reduction,
                                                                       num_labels, labels_im, r)
                         ConnectedRobotRegions[r] = connected
-=======
-                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation*self.current_reduction)
->>>>>>> main
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
                     self.ArrayOfElements[r]+=added_weight
 
@@ -488,7 +472,6 @@ class DARP:
                             self.MetricMatrix[r],
                             ConnectedMultiplierList[r, :, :])
 
-<<<<<<< HEAD
                 #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
                 if total_iteration % 30 == 0:
                     for x in range(self.rows):
@@ -497,17 +480,6 @@ class DARP:
                                 self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], 0.95)
 
                 total_iteration +=1
-=======
-                """
-                for r in range(self.droneNo):
-                    for i in range(min(10, self.rows)):
-                        for j in range(self.cols):
-                            if old_metric[r,i,j] != self.MetricMatrix[r,i,j]:
-                                print(r,i,j, " : old = ", old_metric[r,i,j], "new =", self.MetricMatrix[r,i,j])
-                print()
-                """
-
->>>>>>> main
                 iteration += 1
                 total_iteration +=1
                 #we reduce the size of our steps every so often

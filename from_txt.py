@@ -94,9 +94,5 @@ if __name__ == '__main__':
             current_tile+=1
 
     MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
-<<<<<<< HEAD
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
-                                                passage=list_passage)
-=======
-                                        list_poids, MaxIter=args.iter, tps_affichage=args.show, reduction_step_power=args.slow)
->>>>>>> main
+                                                passage=list_passage, reduction_step_power=args.slow)
