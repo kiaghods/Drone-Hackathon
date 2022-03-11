@@ -80,72 +80,12 @@ def CalcConnectedMultiplier(rows, cols, dist1, dist2, CCvariation):
 
     return returnM
 
-#utility for Djikstra, as priority aren't natively implemented in Python (not with the ability to change priorities)
-#   I resorted to using lists instead, as it is only a cost taking place once
-def min_unvisited_from_list(list, unvisited):
-    index, minima = (-1,-1), 2**30
-    rows, cols = len(list), len(list[0])
-    for x in range(rows):
-        for y in range(cols):
-            if unvisited[x,y]:
-                d = list[x,y]
-                if d<minima:
-                    index=(x,y)
-                    minima = d
-    return index, minima
-
-#updating the distances of neighbours in the grid when visiting (x,y) with distance dist_u
-def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, dist_u, ux, uy):
-    if uy != 0:
-        alternative_path = dist_u + poids_matrice[ux, uy-1]
-        if alternative_path < distances_from_robots[r,ux, uy-1]:
-            distances_from_robots[r,ux, uy-1] = alternative_path
-    if uy != cols-1:
-        alternative_path = dist_u + poids_matrice[ux, uy+1]
-        if alternative_path < distances_from_robots[r,ux, uy+1]:
-            distances_from_robots[r,ux, uy+1] = alternative_path
-    if ux != 0:
-        alternative_path = dist_u + poids_matrice[ux-1, uy]
-        if alternative_path < distances_from_robots[r,ux-1, uy]:
-            distances_from_robots[r,ux-1, uy] = alternative_path
-    if ux != rows-1:
-        alternative_path = dist_u + poids_matrice[ux+1, uy]
-        if alternative_path < distances_from_robots[r,ux+1, uy]:
-            distances_from_robots[r,ux+1, uy] = alternative_path
-
-#djikstra's algorithm, except it's implemented with lists instead of priority queues
-def bad_djikstra(poids_matrice, rows, cols, GridEnv, initial_positions):
-    droneNo = len(initial_positions)
-    vertexesNo = rows*cols
-    distances_from_robots = np.full((droneNo, rows, cols), 2**30)
-
-    for idx, (x,y) in enumerate(initial_positions):
-        distances_from_robots[idx,x,y] = 0
-    
-    for r in range(droneNo):
-        rx, ry = initial_positions[r][0], initial_positions[r][1]
-        unvisited_set = np.full((rows, cols), True)
-        unvisited_set[rx, ry] = 0
-
-        ux, uy, dist_u = rx, ry, 0
-        
-        while not ux==-1:
-            #we mark that vertex as visited
-            unvisited_set[ux, uy]=False
-            #We can leave from any empty tile or from ourself, but not from obstacles nor from other robots
-            if GridEnv[ux, uy]== -1 or GridEnv[ux, uy]==r:
-                #We thus enumerate our (possible) neighbours
-                exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, r, dist_u, ux, uy)
-
-            (ux, uy), dist_u = min_unvisited_from_list(distances_from_robots[r], unvisited_set)
-    return distances_from_robots
-
 
 class DARP():
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.0001, dcells=2,
-                 importance=False, poids = [], tps_affichage = 0.05):
+                 importance=False, poids = [], tps_affichage = 0.05, reduction_step_power = 8):
 
         self.rows = nx
         self.cols = ny
@@ -167,6 +107,8 @@ class DARP():
         self.importance = importance
         self.notEqualPortions = notEqualPortions
         self.tps_affichage = tps_affichage
+        self.reduction_step = 1-10**(-reduction_step_power)
+        self.current_reduction = 1
     
 
         print("\nInitial Conditions Defined:")
@@ -299,6 +241,8 @@ class DARP():
         success = False
         cancelled = False
         criterionMatrix = np.zeros((self.rows, self.cols))
+        iteration = 0
+        total_iteration=0
 
         while self.termThr <= self.dcells and not success and not cancelled:
             downThres = (self.Notiles - self.termThr*(self.droneNo-1))/(self.Notiles*self.droneNo)
@@ -335,7 +279,7 @@ class DARP():
                         BinaryRobot, BinaryNonRobot = constructBinaryImages(labels_im, self.initial_positions[r], self.rows, self.cols)
                         ConnectedMultiplier = CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
-                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation)
+                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation*self.current_reduction)
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
                     plainErrors[r] = self.ArrayOfElements[r]/(self.DesireableAssign[r]*self.droneNo)
                     if plainErrors[r] < downThres:
@@ -362,9 +306,9 @@ class DARP():
                     if totalNegPlainErrors != 0:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
                         if divFairError[r] < 0:
-                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)
+                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction
                         else:
-                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)
+                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction
 
                         criterionMatrix = self.calculateCriterionMatrix(
                                 self.TilesImportance[r],
@@ -373,10 +317,6 @@ class DARP():
                                 correctionMult[r],
                                 divFairError[r] < 0)
 
-<<<<<<< HEAD
-                    #old_metric[r] = self.MetricMatrix[r, :, :]
-=======
->>>>>>> without_djikstra
                     #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
                     self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
                             criterionMatrix,
@@ -394,6 +334,11 @@ class DARP():
                 """
 
                 iteration += 1
+                total_iteration +=1
+                #we reduce the size of our steps every so often
+                if total_iteration %30 ==0:
+                    self.current_reduction *= self.reduction_step
+                    print("current weakening :", self.current_reduction)
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
