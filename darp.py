@@ -99,8 +99,6 @@ def ConnectedComponentWarpDistance(num_labels, labels_im, poids_matrice, r_posit
         else:
             connected = False
 
-    print(weights)
-
     tab_coeffs = np.ones(num_labels)
     if max_weight>0:
         for label in range(num_labels-1):
@@ -423,7 +421,7 @@ class DARP:
                         BinaryRobot, BinaryNonRobot = constructBinaryImages(labels_im, self.initial_positions[r], self.rows, self.cols)
                         ConnectedMultiplier, added_weight, connected = self.CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
-                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation*self.current_reduction,
+                                                                      self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation,
                                                                       num_labels, labels_im, r)
                         ConnectedRobotRegions[r] = connected
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
@@ -522,7 +520,6 @@ class DARP:
         return MMnew
 
     def IsThisAGoalState(self, thresh, connectedRobotRegions):
-        print("goal verification : weight repartition", self.ArrayOfElements, "and connectedness :", connectedRobotRegions)
         for r in range(self.droneNo):
             if np.absolute(self.DesireableAssign[r] - self.ArrayOfElements[r]) > thresh or not connectedRobotRegions[r]:
                 return False
