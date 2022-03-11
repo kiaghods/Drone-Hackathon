@@ -373,7 +373,10 @@ class DARP():
                                 correctionMult[r],
                                 divFairError[r] < 0)
 
+<<<<<<< HEAD
                     #old_metric[r] = self.MetricMatrix[r, :, :]
+=======
+>>>>>>> without_djikstra
                     #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
                     self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
                             criterionMatrix,
@@ -474,7 +477,7 @@ class DARP():
             if (DesireableAssign[i] != int(DesireableAssign[i]) and termThr != 1):
                 termThr = 1
 
-        AllDistances = bad_djikstra(self.poids_matrice, self.rows, self.cols, self.GridEnv, self.initial_positions)
+        AllDistances = np.zeros((self.droneNo, self.rows, self.cols))
         TilesImportance = np.zeros((self.droneNo, self.rows, self.cols))
 
 
@@ -482,7 +485,8 @@ class DARP():
             for y in range(self.cols):
                 tempSum = 0
                 for r in range(self.droneNo):
-                    if AllDistances[r, x, y] > MaximunDist[r] and AllDistances[r,x,y]<2**30:
+                    AllDistances[r, x, y] = np.linalg.norm(np.array(self.initial_positions[r]) - np.array((x, y)))  # E!
+                    if AllDistances[r, x, y] > MaximunDist[r]:
                         MaximunDist[r] = AllDistances[r, x, y]
                     tempSum += AllDistances[r, x, y]
 
