@@ -522,6 +522,7 @@ class DARP:
         return MMnew
 
     def IsThisAGoalState(self, thresh, connectedRobotRegions):
+        print("goal verification : weight repartition", self.ArrayOfElements, "and connectedness :", connectedRobotRegions)
         for r in range(self.droneNo):
             if np.absolute(self.DesireableAssign[r] - self.ArrayOfElements[r]) > thresh or not connectedRobotRegions[r]:
                 return False
