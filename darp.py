@@ -1,3 +1,4 @@
+from ast import Return
 import numpy as np
 import copy
 import sys
@@ -70,9 +71,42 @@ def constructBinaryImages(A, robo_start_point, rows, cols):
 
     return BinaryRobot, BinaryNonRobot
 
+def find_back_path(distance_matrix, poids_matrice, x, y):
+    rows, cols = np.shape(distance_matrix)
+    dist = distance_matrix[x,y]
+    u_x, u_y = x,y
+    n_x, n_y = x,y
+    list_crossed_tiles = []
+    new_dist = dist
+    while dist>0:
+        #We can only find the smallest distance, as all edges to u_x, u_y have the same weight
+        if u_y != 0:
+            #we want to be able to join back the river, of same weight as we are
+            if distance_matrix[u_x, u_y-1] <  new_dist or (distance_matrix[u_x, u_y-1] == new_dist 
+            and poids_matrice[u_x, u_y]>0 and poids_matrice[u_x, u_y-1]<0):
+                new_dist = distance_matrix[u_x, u_y-1]
+                n_x, n_y = u_x, u_y-1
+        if u_y != cols-1:
+            if distance_matrix[u_x, u_y+1] <  new_dist or (distance_matrix[u_x, u_y+1] == new_dist and 
+            poids_matrice[u_x, u_y]>0 and poids_matrice[u_x, u_y+1]<0):
+                    new_dist = distance_matrix[u_x, u_y+1]
+                    n_x, n_y = u_x, u_y+1
+        if u_x != 0:
+            if distance_matrix[u_x-1, u_y] <  new_dist or (distance_matrix[u_x-1, u_y] == new_dist and
+            poids_matrice[u_x, u_y]>0 and poids_matrice[u_x-1, u_y]>0):
+                new_dist = distance_matrix[u_x-1, u_y]
+                n_x, n_y = u_x-1, u_y
+        if u_x != cols-1:
+            if distance_matrix[u_x+1, u_y] <  new_dist or (distance_matrix[u_x+1, u_y] == new_dist and
+            poids_matrice[u_x, u_y]>0 and poids_matrice[u_x+1, u_y]<0):
+                    new_dist = distance_matrix[u_x+1, u_y]
+                    n_x, n_y = u_x+1, u_y
+        dist = new_dist
+        list_crossed_tiles.append((n_x, n_y))
+        u_x, u_y = n_x, n_y
+    return list_crossed_tiles
 
 def ConnectedComponentWarpDistance(num_labels, labels_im, poids_matrice, r_position, passage_positions, max_coeff):
-    weights = np.zeros(num_labels-1)
     total_weight = 0
     max_weight = -1
     connected = True
@@ -80,31 +114,45 @@ def ConnectedComponentWarpDistance(num_labels, labels_im, poids_matrice, r_posit
     rows, cols = np.shape(poids_matrice)
 
     distance_matrix = WarpDistanceToRegion(labels_im, poids_matrice, passage_positions, r_position, initial_label)
+    paths_to_labels = [[] for i in range(num_labels)]
+    min_distance_paths_to_labels = np.full(num_labels, 2**30)
+    min_distance_paths_to_labels[initial_label] = 0
+    closest_cell_per_label = [(-1,-1)for r in range(num_labels)]
+    closest_cell_per_label[initial_label] = (r_position[0], r_position[1])
 
-    for label in range(1,num_labels):
-        #revoir cette portion, qu'elle soit plus efficace
-        min_distance_path_to_label = 2**30
-        for x in range(rows):
-            for y in range(cols):
-                if labels_im[x,y] == label:
-                    min_distance_path_to_label = min(min_distance_path_to_label, distance_matrix[x,y])
-        weight = min_distance_path_to_label
+    for x in range(rows):
+        for y in range(cols):
+            label = labels_im[x,y]
+            if distance_matrix[x,y] < min_distance_paths_to_labels[label]:
+                min_distance_paths_to_labels[label] = distance_matrix[x,y]
+                closest_cell_per_label[label] = x, y
 
-        weights[label-1] = weight
-        if weight < 2**30:
-            if weight >0:
-                total_weight += weight
-            if weight > max_weight:
-                max_weight = weight
+    #We thus exclude 0, which is the label of all the "other" cells
+    for label in range(1, num_labels):
+        x,y = closest_cell_per_label[label]
+        paths_to_labels[label] = find_back_path(distance_matrix, poids_matrice, x, y)
+
+        distance = min_distance_paths_to_labels[label]
+
+        if distance < 2**30:
+            if distance >0:
+                total_weight += distance
+            if distance > max_weight:
+                max_weight = distance
         else:
             connected = False
 
+    used_path_cells = []
+    for label in range(num_labels):
+        for x,y in paths_to_labels[label]:
+            used_path_cells.append((x,y))
+
     tab_coeffs = np.ones(num_labels)
     if max_weight>0:
-        for label in range(num_labels-1):
-            if weights[label]<2**30:
-                tab_coeffs[label+1] = max_coeff * ((weights[label]**3)/(max_weight**3))
-    return tab_coeffs, total_weight, connected
+        for label in range(1, num_labels):
+            if min_distance_paths_to_labels[label]<2**30:
+                tab_coeffs[label] = max_coeff * ((min_distance_paths_to_labels[label]**3)/(max_weight**3))
+    return tab_coeffs, total_weight, connected, used_path_cells
 
 #utility for Djikstra, as priority aren't natively implemented in Python (not with the ability to change priorities)
 #   I resorted to using lists instead, as it is only a cost taking place once
@@ -125,28 +173,28 @@ def exploration_neighbours(rows, cols, poids_matrice, distances_from_robots, dis
             if alternative_path < distances_from_robots[ux, uy-1]:
                 distances_from_robots[ux, uy-1] = alternative_path
         else: #we only look at the river-crossing cost
-            distances_from_robots[ux, uy-1] = dist_u
+            distances_from_robots[ux, uy-1] = min(dist_u, distances_from_robots[ux, uy-1])
     if uy != cols-1:
         if poids_matrice[ux, uy+1] < 0:
             alternative_path = dist_u - poids_matrice[ux, uy+1]
             if alternative_path < distances_from_robots[ux, uy+1]:
                 distances_from_robots[ux, uy+1] = alternative_path
         else:
-            distances_from_robots[ux, uy+1] = dist_u
+            distances_from_robots[ux, uy+1] = min(dist_u, distances_from_robots[ux, uy+1])
     if ux != 0:
         if poids_matrice[ux-1, uy] <0:
             alternative_path = dist_u - poids_matrice[ux-1, uy]
             if alternative_path < distances_from_robots[ux-1, uy]:
                 distances_from_robots[ux-1, uy] = alternative_path
         else:
-            distances_from_robots[ux-1, uy] = dist_u
+            distances_from_robots[ux-1, uy] = min(dist_u, distances_from_robots[ux-1, uy])
     if ux != rows-1:
         if poids_matrice[ux+1, uy] <0:
             alternative_path = dist_u - poids_matrice[ux+1, uy]
             if alternative_path < distances_from_robots[ux+1, uy]:
                 distances_from_robots[ux+1, uy] = alternative_path
         else:
-            distances_from_robots[ux+1, uy] = dist_u
+            distances_from_robots[ux+1, uy] = min(dist_u, distances_from_robots[ux+1, uy])
 
 
 #djikstra's algorithm, except it's implemented with lists instead of priority queues
@@ -166,6 +214,7 @@ def WarpDistanceToRegion(labels_im, poids_matrice, passage_positions, initial_po
     for x in range(rows):
         for y in range(cols):
             if labels_im[x,y] == initial_label:
+                distances_from_robot[x,y]=0
                 exploration_neighbours(rows, cols, poids_matrice, distances_from_robot, 0, x, y)
 
     distances_from_robot[rx, ry] = 0
@@ -209,6 +258,7 @@ class DARP:
         self.droneNo = len(self.initial_positions)
         self.passage = False
         self.PassageNo = 0
+        self.used_passages = [[] for r in range(self.droneNo)]
         if given_passage != []:
             self.passage = True
             self.passageNo = len(given_passage)
@@ -419,11 +469,12 @@ class DARP:
                     num_labels, labels_im = cv2.connectedComponents(image, connectivity=4)
                     if num_labels > 2:
                         BinaryRobot, BinaryNonRobot = constructBinaryImages(labels_im, self.initial_positions[r], self.rows, self.cols)
-                        ConnectedMultiplier, added_weight, connected = self.CalcConnectedMultiplier(self.rows, self.cols,
+                        ConnectedMultiplier, added_weight, connected, used_path_cells = self.CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
                                                                       self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation,
                                                                       num_labels, labels_im, r)
                         ConnectedRobotRegions[r] = connected
+                        self.used_passages[r] = used_path_cells
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
                     self.ArrayOfElements[r]+=added_weight
 
@@ -500,7 +551,14 @@ class DARP:
     def getBinaryRobotRegions(self):
         ind = np.where(self.A < self.droneNo)
         temp = (self.A[ind].astype(int),)+ind
-        self.BinaryRobotRegions[temp] = True
+        temp_r, temp_x, temp_y = temp[0].tolist(), temp[1].tolist(), temp[2].tolist()
+        for r in range(self.droneNo):
+            for x,y in self.used_passages[r]:
+                temp_r.append(r)
+                temp_x.append(x)
+                temp_y.append(y)
+        temp_with_rivers = np.asarray(temp_r), np.asarray(temp_x), np.asarray(temp_y)
+        self.BinaryRobotRegions[temp_with_rivers] = True
 
     def generateRandomMatrix(self):
         RandomMatrix = np.zeros((self.rows, self.cols))
@@ -509,12 +567,6 @@ class DARP:
 
     def FinalUpdateOnMetricMatrix(self, CM, RM, currentOne, CC):
         MMnew = np.zeros((self.rows, self.cols))
-        """
-        print("current one", currentOne)
-        print("criterion", CM)
-        print("random", RM)
-        print("connected multiplier", CC, "\n")
-        """
         MMnew = currentOne*CM*RM*CC
 
         return MMnew
@@ -630,7 +682,7 @@ class DARP:
                 if MinV > returnM[i, j]:
                     MinV = returnM[i, j]
 
-        coeffs_labels, total_weight, connected = ConnectedComponentWarpDistance(num_labels, labels_im, self.poids_matrice, 
+        coeffs_labels, total_weight, connected, used_path_cells = ConnectedComponentWarpDistance(num_labels, labels_im, self.poids_matrice, 
                                                     self.initial_positions[r], self.passage_positions, 1)
 
         #we split proportionnally the differences between 1-CCvariation and 1+CCvariation
@@ -641,7 +693,7 @@ class DARP:
                     returnM[i,j]*= coeffs_labels[labels_im[i,j]]
                 returnM[i, j] = (returnM[i, j]-MinV)*((2*CCvariation)/(MaxV - MinV)) + (1-CCvariation)
 
-        return returnM, total_weight, connected
+        return returnM, total_weight, connected, used_path_cells
 
     def NormalizedEuclideanDistanceBinary(self, RobotR, BinaryRobot, BinaryNonRobot):
         if RobotR:
