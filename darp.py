@@ -130,7 +130,8 @@ def ConnectedComponentWarpDistance(num_labels, labels_im, poids_matrice, r_posit
     #We thus exclude 0, which is the label of all the "other" cells
     for label in range(1, num_labels):
         x,y = closest_cell_per_label[label]
-        paths_to_labels[label] = find_back_path(distance_matrix, poids_matrice, x, y)
+        if min_distance_paths_to_labels[label]<2**30:
+            paths_to_labels[label] = find_back_path(distance_matrix, poids_matrice, x, y)
 
         distance = min_distance_paths_to_labels[label]
 
@@ -466,6 +467,7 @@ class DARP:
                     ConnectedRobotRegions[r] = True
                     self.update_connectivity()
                     image = np.uint8(self.connectivity[r, :, :])
+                    added_weight=0
                     num_labels, labels_im = cv2.connectedComponents(image, connectivity=4)
                     if num_labels > 2:
                         BinaryRobot, BinaryNonRobot = constructBinaryImages(labels_im, self.initial_positions[r], self.rows, self.cols)
