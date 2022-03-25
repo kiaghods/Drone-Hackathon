@@ -231,12 +231,23 @@ def WarpDistanceToRegion(labels_im, poids_matrice, passage_positions, initial_po
 
     return distances_from_robot
 
+def printing_metrics(MetricMatrix):
+    droneNo, rows, cols = np.shape(MetricMatrix)
+    for x in range(rows):
+        print(x, ": [", end="")
+        for y in range(cols):
+            print(y, "(", end="")
+            for r in range(droneNo):
+                print(MetricMatrix[r, x, y], end=" ")
+            print(")")
+        print("]\n")
 
 class DARP:
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.0001, dcells=2,
-                 importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step_power = 8):
+                 importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step_power = 8,
+                 scale_down = False):
                  #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
                  #  they can be seen as "semi-obstacles"
 
@@ -274,6 +285,7 @@ class DARP:
         self.tps_affichage = tps_affichage
         self.reduction_step = 1-10**(-reduction_step_power)
         self.current_reduction = 1
+        self.scale_down = scale_down
     
 
         print("\nInitial Conditions Defined:")
@@ -315,7 +327,7 @@ class DARP:
             self.dcells = dcells_weight
             #There's the slight issue if you want dcells to be EXACTLY 2 despiste weights, but well, you can always put 2.01 then
 
-        print("The minimum deviation is", self.termThr, "and it will go up to", self.termThr+self.dcells)
+        print("The minimum deviation is", self.termThr, "and it will go up to", self.dcells)
 
         for r in range(self.droneNo):
             np.random.seed(r)
@@ -524,7 +536,7 @@ class DARP:
                             ConnectedMultiplierList[r, :, :])
 
                 #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
-                if total_iteration % 30 == 0:
+                if self.scale_down and total_iteration % 30 == 0:
                     for x in range(self.rows):
                         for y in range(self.cols):
                             for r in range(self.droneNo):
@@ -532,11 +544,13 @@ class DARP:
 
                 total_iteration +=1
                 iteration += 1
-                total_iteration +=1
                 #we reduce the size of our steps every so often
-                if total_iteration %30 ==0:
-                    self.current_reduction *= self.reduction_step
-                    print("current weakening :", self.current_reduction)
+                if total_iteration %100 ==0:
+                    printing_metrics(self.MetricMatrix)
+                    print(ConnectedMultiplierList)
+                    print(self.A)
+                #    self.current_reduction *= self.reduction_step
+                #    print("current weakening :", self.current_reduction)
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
@@ -546,7 +560,7 @@ class DARP:
                 success = False
                 self.termThr += 1
 
-        print("exiting with a deviation of", self.termThr)
+        print("exiting with a deviation of", self.termThr, "after", total_iteration, "iterations")
         self.getBinaryRobotRegions()
         return success, iteration
 
@@ -618,7 +632,7 @@ class DARP:
             termThr = 1
         if not self.poids_uniforme:
             termThr = min_weight
-            dcells = max_weight + (total_passage_weight // self.droneNo)
+            dcells = max(2, max_weight + (total_passage_weight // self.droneNo))
             print("max_weight =", max_weight, ", dcells =", dcells)
 
         DesireableAssign = np.zeros(self.droneNo)
@@ -691,9 +705,10 @@ class DARP:
         for i in range(rows):
             for j in range(cols):
                 #in the case of a disconnected component
-                if returnM[i,j]>0:
-                    returnM[i,j]*= coeffs_labels[labels_im[i,j]]
-                returnM[i, j] = (returnM[i, j]-MinV)*((2*CCvariation)/(MaxV - MinV)) + (1-CCvariation)
+                connected_incentive = (returnM[i, j]-MinV)*((2*CCvariation)/(MaxV - MinV)) - CCvariation
+                if connected_incentive>0:
+                    connected_incentive*= coeffs_labels[labels_im[i,j]]
+                returnM[i, j] = 1+connected_incentive
 
         return returnM, total_weight, connected, used_path_cells
 
