@@ -54,6 +54,11 @@ if __name__ == '__main__':
         nargs = '?',
         type = int,
         help='the power of 10 by which the gradient step will reduce every 30 iterations (default: 8)')
+    argparser.add_argument(
+        '-root',
+        default=False,
+        action='store_true',
+        help='Apply a reduction to a power < 1 every 30 iterations (default: False)')
     args = argparser.parse_args()
     
     strings_input = readfile(args.file)
@@ -87,7 +92,9 @@ if __name__ == '__main__':
                     sys.exit(3)
             else:
                 try :
-                   list_poids.append((current_tile, float(elt)))
+                    value = float(elt)
+                    if value != 1:
+                        list_poids.append((current_tile, float(elt)))
                 except :
                     print("Not a recognized value at position", current_tile, ": only floats, '@' and '#' accepted, '", elt, "' submitted")
                     sys.exit(3)
@@ -95,4 +102,4 @@ if __name__ == '__main__':
 
     MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
-                                                passage=list_passage, reduction_step_power=args.slow)
+                                                passage=list_passage, reduction_step_power=args.slow, scale_down=args.root)
