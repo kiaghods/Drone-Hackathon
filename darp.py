@@ -1,4 +1,5 @@
 from ast import Return
+import math
 import numpy as np
 import copy
 import sys
@@ -18,8 +19,8 @@ np.random.seed(1)
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
-def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poids_matrice, passage):
-
+def assign(droneNo, rows, cols, min_priorities, GridEnv, MetricMatrix, A, poids_matrice, passage):
+    priorities = np.copy(min_priorities)
     ArrayOfElements = np.zeros(droneNo)
     for i in range(rows):
         for j in range(cols):
@@ -32,6 +33,7 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
                         indMin = r
                 weight = poids_matrice[i,j]
                 A[i][j] = indMin
+                priorities[i][j] = minV
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
                 if weight > 0:
                     ArrayOfElements[indMin] += weight
@@ -41,7 +43,18 @@ def assign(droneNo, rows, cols, initial_positions, GridEnv, MetricMatrix, A, poi
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
-    return A, ArrayOfElements
+    return A, ArrayOfElements, priorities
+
+@njit(fastmath=True)
+def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size, poids_matrice):
+    rows, cols = np.shape(min_priorities)
+    sum = 0
+    for x in range(rows):
+        for y in range(cols):
+            ecart_a_combler = min_priorities[x][y] - metric_matrix[x][y]
+            sum+= poids_matrice[x][y] * math.e**(-(ecart_a_combler**2)) / np.sqrt(2*math.pi)
+    return sum/np.sqrt(effective_size)
+
 
 @njit(fastmath=True)
 def inverse_binary_map_as_uint8(BinaryMap):
@@ -312,13 +325,14 @@ class DARP:
 
         self.droneNo = len(self.initial_positions)
         self.A = np.zeros((self.rows, self.cols))
+        self.min_priorities = np.ones((self.rows, self.cols))
         self.poids_matrice = np.full((self.rows, self.cols), 1)
         self.defineGridEnv()
    
         self.connectivity = np.zeros((self.droneNo, self.rows, self.cols))
         self.BinaryRobotRegions = np.zeros((self.droneNo, self.rows, self.cols), dtype=bool)
 
-        self.AllDistances, self.termThr, dcells_weight, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance= self.construct_Assignment_Matrix()
+        self.AllDistances, self.termThr, dcells_weight, self.Notiles, self.DesireableAssign, self.TilesImportance, self.MinimumImportance, self.MaximumImportance, self.effectiveSize= self.construct_Assignment_Matrix()
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
         self.ArrayOfElements = np.zeros(self.droneNo)
         self.color = []
@@ -458,10 +472,10 @@ class DARP:
             iteration=0
 
             while iteration <= self.MaxIter and not cancelled:
-                self.A, self.ArrayOfElements = assign(self.droneNo,
+                self.A, self.ArrayOfElements, self.min_priorities = assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
-                                                                   self.initial_positions,
+                                                                   self.min_priorities,
                                                                    self.GridEnv,
                                                                    self.MetricMatrix,
                                                                    self.A,
@@ -473,8 +487,11 @@ class DARP:
                 plainErrors = np.zeros((self.droneNo))
                 #same as plainErrors, but reduced by the eventual allowed threshold
                 divFairError = np.zeros((self.droneNo))
+                div_updated_error = np.zeros((self.droneNo))
 
                 for r in range(self.droneNo):
+                    distance_coeff = decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
+
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
                     ConnectedRobotRegions[r] = True
                     self.update_connectivity()
@@ -486,7 +503,7 @@ class DARP:
                         ConnectedMultiplier, added_weight, connected, used_path_cells = self.CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
                                                                       self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation,
-                                                                      num_labels, labels_im, r)
+                                                                      num_labels, labels_im, r, distance_coeff)
                         ConnectedRobotRegions[r] = connected
                         self.used_passages[r] = used_path_cells
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
@@ -517,9 +534,10 @@ class DARP:
                     if totalNegPlainErrors != 0:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
                         if divFairError[r] < 0:
-                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction
+                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*distance_coeff
                         else:
-                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction
+                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*distance_coeff
+                        print(correctionMult[r], end=" ")
 
                         criterionMatrix = self.calculateCriterionMatrix(
                                 self.TilesImportance[r],
@@ -534,7 +552,6 @@ class DARP:
                             self.generateRandomMatrix(),
                             self.MetricMatrix[r],
                             ConnectedMultiplierList[r, :, :])
-
                 #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
                 if self.scale_down and total_iteration % 30 == 0:
                     for x in range(self.rows):
@@ -544,9 +561,10 @@ class DARP:
 
                 total_iteration +=1
                 iteration += 1
+                if total_iteration%30==0:
+                    printing_metrics(self.MetricMatrix)
                 #we reduce the size of our steps every so often
                 if total_iteration %100 ==0:
-                    printing_metrics(self.MetricMatrix)
                     print(ConnectedMultiplierList)
                     print(self.A)
                 #    self.current_reduction *= self.reduction_step
@@ -618,9 +636,7 @@ class DARP:
                         weight = self.poids_matrice[x,y]
                         max_weight = max(max_weight, abs(weight))
                         min_weight = min(min_weight, abs(weight))
-                        if weight >0:
-                            #which allows to not consider passage tiles in our desirable weight
-                            effectiveSize += weight
+                        effectiveSize += weight
                     elif self.GridEnv[x,y]==-2 and self.poids_matrice[x,y] <0:
                         total_passage_weight -= self.poids_matrice[x,y]
         print("effective size :", effectiveSize)
@@ -671,7 +687,7 @@ class DARP:
                     if TilesImportance[r, x, y] < MinimumImportance[r]:
                         MinimumImportance[r] = TilesImportance[r, x, y]
 
-        return AllDistances, termThr, dcells, Notiles, DesireableAssign, TilesImportance, MinimumImportance, MaximumImportance
+        return AllDistances, termThr, dcells, Notiles, DesireableAssign, TilesImportance, MinimumImportance, MaximumImportance, effectiveSize
 
     def calculateCriterionMatrix(self, TilesImportance, MinimumImportance, MaximumImportance, correctionMult, smallerthan_zero,):
         returnCrit = np.zeros((self.rows, self.cols))
@@ -685,7 +701,7 @@ class DARP:
 
         return returnCrit
 
-    def CalcConnectedMultiplier(self, rows, cols, dist1, dist2, CCvariation, num_labels, labels_im, r):
+    def CalcConnectedMultiplier(self, rows, cols, dist1, dist2, CCvariation, num_labels, labels_im, r, coeff_derivation):
         returnM = np.zeros((rows, cols))
         MaxV = 0
         MinV = 2**30
@@ -707,7 +723,7 @@ class DARP:
                 #in the case of a disconnected component
                 connected_incentive = (returnM[i, j]-MinV)*((2*CCvariation)/(MaxV - MinV)) - CCvariation
                 if connected_incentive>0:
-                    connected_incentive*= coeffs_labels[labels_im[i,j]]
+                    connected_incentive*= coeffs_labels[labels_im[i,j]]*coeff_derivation
                 returnM[i, j] = 1+connected_incentive
 
         return returnM, total_weight, connected, used_path_cells
