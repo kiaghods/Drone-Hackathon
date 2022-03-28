@@ -1,11 +1,36 @@
-categorie, unweighted, clustered, random
-couloir_avec_bureaux, 141, 148, 175
-collines, 94, 111, 50002
-barrieres, 144, 420, 352
-konigsberg, 61, 168, 54
-
-now with rooting
-couloir_avec_bureaux, 137, 176, 136
-collines, 85, 96, 2453
-barrieres, 412, 320, 257
-konigsberg, 59, 135, 50
+default, unweighted, clustered, random
+couloir_avec_bureaux,141,148,175
+collines,94,111,50002
+barrieres,144,420,352
+konigsberg,61,168,54
+montagne,122,Inf – goulot,53
+,,,
+now with rooting,,,
+couloir_avec_bureaux,137,176,136
+collines,85,96,2453
+barrieres,412,320,257
+konigsberg,59,135,50
+montagne,743,278,1417
+,,,
+with decreasing gradient with rooted weight,,,
+couloir_avec_bureaux,154, Inf – goulot,129
+collines,101,110,86
+barrieres,697,132,214
+konigsberg,39,72,34
+montagne,159,Inf – goulot,538
+,,,
+with decreasing gradient,,,
+couloir_avec_bureaux,77,110,78
+collines,58,72,50002
+barrieres,74,55,Inf – monopole
+konigsberg,43,1130,33
+montagne,405,261,205
+couloir_biparti,1969,,
+,,,
+with decreasing gradient & rooted weight,,,
+couloir_avec_bureaux,91,236,88
+collines,50,69,54
+barrieres,59,67,9678
+konigsberg,39,58,32
+montagne,158,154,120
+couloir_biparti,6584,,
