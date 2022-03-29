@@ -56,7 +56,7 @@ def get_area_indices(area, value, inv=False, obstacle=-1):
 class MultiRobotPathPlanner(DARP):
     def __init__(self, nx, ny, notEqualPortions, initial_positions, portions,
                  obs_pos, visualization, poids, MaxIter=80000, CCvariation=0.06,
-                 randomLevel=0.0001, dcells=2, importance=False, tps_affichage = 0.05, passage = [],
+                 randomLevel=0.00001, dcells=2, importance=False, tps_affichage = 0.05, passage = [],
                  reduction_step_power = 8, scale_down = False):
 
         start_time = time.time()
