@@ -19,8 +19,8 @@ np.random.seed(1)
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
-def assign(droneNo, rows, cols, min_priorities, GridEnv, MetricMatrix, A, poids_matrice, passage):
-    priorities = np.copy(min_priorities)
+def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
+    priorities = np.zeros((rows, cols))
     ArrayOfElements = np.zeros(droneNo)
     for i in range(rows):
         for j in range(cols):
@@ -258,7 +258,7 @@ def printing_metrics(MetricMatrix):
 class DARP:
     def __init__(self, nx, ny, notEqualPortions, given_initial_positions, given_portions, obstacles_positions,
                  visualization, MaxIter=80000, CCvariation=0.01,
-                 randomLevel=0.0001, dcells=2,
+                 randomLevel=0.00001, dcells=2,
                  importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step_power = 8,
                  scale_down = False):
                  #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
@@ -472,15 +472,13 @@ class DARP:
             iteration=0
 
             while iteration <= self.MaxIter and not cancelled:
-                self.A, self.ArrayOfElements, self.min_priorities = assign(self.droneNo,
+                self.A, self.ArrayOfElements, self.min_priorities, = assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
-                                                                   self.min_priorities,
                                                                    self.GridEnv,
                                                                    self.MetricMatrix,
                                                                    self.A,
-                                                                   self.poids_matrice,
-                                                                   self.passage)
+                                                                   self.poids_matrice)
                 #here however we only look at the droneNo "true" drones, as we have no connectivity constraint on the false one
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
@@ -490,7 +488,7 @@ class DARP:
                 div_updated_error = np.zeros((self.droneNo))
 
                 for r in range(self.droneNo):
-                    distance_coeff = decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
+                    derivation_coeff = decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
 
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
                     ConnectedRobotRegions[r] = True
@@ -503,7 +501,7 @@ class DARP:
                         ConnectedMultiplier, added_weight, connected, used_path_cells = self.CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
                                                                       self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation,
-                                                                      num_labels, labels_im, r, distance_coeff)
+                                                                      num_labels, labels_im, r, derivation_coeff)
                         ConnectedRobotRegions[r] = connected
                         self.used_passages[r] = used_path_cells
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
@@ -534,10 +532,9 @@ class DARP:
                     if totalNegPlainErrors != 0:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
                         if divFairError[r] < 0:
-                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*distance_coeff
+                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*derivation_coeff
                         else:
-                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*distance_coeff
-                        print(correctionMult[r], end=" ")
+                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*derivation_coeff
 
                         criterionMatrix = self.calculateCriterionMatrix(
                                 self.TilesImportance[r],
