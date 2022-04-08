@@ -1,4 +1,4 @@
-import pickle
+from fileinput import filename
 
 from darp import DARP
 import numpy as np
@@ -57,7 +57,7 @@ class MultiRobotPathPlanner(DARP):
     def __init__(self, nx, ny, notEqualPortions, initial_positions, portions,
                  obs_pos, visualization, poids, MaxIter=80000, CCvariation=0.06,
                  randomLevel=0.00001, dcells=2, importance=False, tps_affichage = 0.05, passage = [],
-                 reduction_step_power = 8, scale_down = False):
+                 reduction_step_power = 8, scale_down = False, output="dump_results.txt", filename = "no specified file"):
 
         start_time = time.time()
         # Initialize DARP
@@ -65,7 +65,7 @@ class MultiRobotPathPlanner(DARP):
                                   MaxIter=MaxIter, CCvariation=CCvariation,
                                   randomLevel=randomLevel, dcells=dcells,
                                   importance=importance, poids = poids, tps_affichage= tps_affichage, given_passage=passage,
-                                  reduction_step_power = reduction_step_power, scale_down = scale_down)
+                                  reduction_step_power = reduction_step_power, scale_down = scale_down, output = output, filename=filename)
 
         # Divide areas based on robots initial positions
         self.DARP_success , self.iterations = self.darp_instance.divideRegions()
