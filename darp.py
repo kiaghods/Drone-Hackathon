@@ -16,10 +16,17 @@ random.seed(1)
 os.environ['PYTHONHASHSEED'] = str(1)
 np.random.seed(1)
 
+BLINKING_LAPSE = 10
+BLINKING_THRES = 3*10**-3
+
+def connectivity_function(a,b):
+    return a**0.75-b**0.75
+
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
 def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
+    blinking = np.full((rows, cols), False)
     priorities = np.zeros((rows, cols))
     ArrayOfElements = np.zeros(droneNo)
     for i in range(rows):
@@ -32,6 +39,8 @@ def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
                         minV = MetricMatrix[r, i, j]
                         indMin = r
                 weight = poids_matrice[i,j]
+                if indMin != A[i][j]:
+                    blinking[i, j] = True
                 A[i][j] = indMin
                 priorities[i][j] = minV
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
@@ -43,7 +52,7 @@ def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
-    return A, ArrayOfElements, priorities
+    return A, ArrayOfElements, priorities, blinking
 
 @njit(fastmath=True)
 def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size, poids_matrice):
@@ -55,6 +64,12 @@ def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size
             sum+= poids_matrice[x][y] * math.e**(-(ecart_a_combler**2)) / np.sqrt(2*math.pi)
     return sum/np.sqrt(effective_size)
 
+def blinking_frequency(blinking, x, y):
+    changes = 0
+    for i in range(BLINKING_LAPSE):
+        if blinking[i,x,y]:
+            changes +=1
+    return changes
 
 @njit(fastmath=True)
 def inverse_binary_map_as_uint8(BinaryMap):
@@ -260,7 +275,7 @@ class DARP:
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.00001, dcells=2,
                  importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step_power = 8,
-                 scale_down = False):
+                 scale_down = False, output="dump_results.txt", filename =  "no file specified"):
                  #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
                  #  they can be seen as "semi-obstacles"
 
@@ -299,6 +314,8 @@ class DARP:
         self.reduction_step = 1-10**(-reduction_step_power)
         self.current_reduction = 1
         self.scale_down = scale_down
+        self.output = output
+        self.output_string = filename
     
 
         print("\nInitial Conditions Defined:")
@@ -336,6 +353,7 @@ class DARP:
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
         self.ArrayOfElements = np.zeros(self.droneNo)
         self.color = []
+        self.blinking = np.full((10, self.rows, self.cols), False)
 
         if self.dcells ==2: #that is, the default value
             self.dcells = dcells_weight
@@ -472,7 +490,7 @@ class DARP:
             iteration=0
 
             while iteration <= self.MaxIter and not cancelled:
-                self.A, self.ArrayOfElements, self.min_priorities, = assign(self.droneNo,
+                self.A, self.ArrayOfElements, self.min_priorities, self.blinking[total_iteration % 10]= assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
                                                                    self.GridEnv,
@@ -546,7 +564,7 @@ class DARP:
                     #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
                     self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
                             criterionMatrix,
-                            self.generateRandomMatrix(),
+                            self.generateRandomMatrix(r),
                             self.MetricMatrix[r],
                             ConnectedMultiplierList[r, :, :])
                 #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
@@ -562,7 +580,7 @@ class DARP:
                     printing_metrics(self.MetricMatrix)
                 #we reduce the size of our steps every so often
                 if total_iteration %100 ==0:
-                    print(ConnectedMultiplierList)
+                #    print(ConnectedMultiplierList)
                     print(self.A)
                 #    self.current_reduction *= self.reduction_step
                 #    print("current weakening :", self.current_reduction)
@@ -577,7 +595,7 @@ class DARP:
 
         print("exiting with a deviation of", self.termThr, "after", total_iteration, "iterations")
         self.getBinaryRobotRegions()
-        return success, iteration
+        return success, total_iteration
 
     def getBinaryRobotRegions(self):
         ind = np.where(self.A < self.droneNo)
@@ -591,9 +609,14 @@ class DARP:
         temp_with_rivers = np.asarray(temp_r), np.asarray(temp_x), np.asarray(temp_y)
         self.BinaryRobotRegions[temp_with_rivers] = True
 
-    def generateRandomMatrix(self):
+    def generateRandomMatrix(self, r):
         RandomMatrix = np.zeros((self.rows, self.cols))
         RandomMatrix = 2*self.randomLevel*np.random.uniform(0, 1,size=RandomMatrix.shape) + (1 - self.randomLevel)
+        for x in range(self.rows):
+            for y in range(self.cols):
+                if blinking_frequency(self.blinking, x, y) > 4 and np.random.uniform(0, 1) < BLINKING_THRES:
+                    RandomMatrix[x,y] = 0.5
+                    print("blinking in", x, y)
         return RandomMatrix
 
     def FinalUpdateOnMetricMatrix(self, CM, RM, currentOne, CC):
@@ -705,7 +728,8 @@ class DARP:
 
         for i in range(rows):
             for j in range(cols):
-                returnM[i, j] = dist1[i, j] - dist2[i, j]
+                a, b = dist1[i, j], dist2[i, j]
+                returnM[i, j] = connectivity_function(a,b)
                 if MaxV < returnM[i, j]:
                     MaxV = returnM[i, j]
                 if MinV > returnM[i, j]:
