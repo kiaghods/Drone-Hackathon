@@ -1,36 +1,128 @@
-default, unweighted, clustered, random
-couloir_avec_bureaux,141,148,175
-collines,94,111,50002
-barrieres,144,420,352
-konigsberg,61,168,54
-montagne,122,Inf – goulot,53
-,,,
-now with rooting,,,
-couloir_avec_bureaux,137,176,136
-collines,85,96,2453
-barrieres,412,320,257
-konigsberg,59,135,50
-montagne,743,278,1417
-,,,
-with decreasing gradient with rooted weight,,,
-couloir_avec_bureaux,154, Inf – goulot,129
-collines,101,110,86
-barrieres,697,132,214
-konigsberg,39,72,34
-montagne,159,Inf – goulot,538
-,,,
-with decreasing gradient,,,
-couloir_avec_bureaux,77,110,78
-collines,58,72,50002
-barrieres,74,55,Inf – monopole
-konigsberg,43,1130,33
-montagne,405,261,205
-couloir_biparti,1969,,
-,,,
-with decreasing gradient & rooted weight,,,
-couloir_avec_bureaux,91,236,88
-collines,50,69,54
-barrieres,59,67,9678
-konigsberg,39,58,32
-montagne,158,154,120
-couloir_biparti,6584,,
+default, unweighted, clustered, random,,now with rooting,,,,,,,,
+couloir_avec_bureaux,141,148,175,,couloir_avec_bureaux,137,176,136,,,,,
+collines,94,111,50002,,collines,85,96,2453,,,,,
+barrieres,144,420,352,,barrieres,412,320,257,,,,,
+konigsberg,61,168,54,,konigsberg,59,135,50,,,,,
+montagne,122,Inf – goulot,53,,montagne,743,278,1417,,,,,
+,,,,,,,,,,,,,
+Now with decreasing gradient,,,,,,,,,,,,,
+blank,,,,,"rooted weight, a-b / (|a+b|^0.5+1)",,,,,"Idem, 0,85",,,
+couloir_avec_bureaux,77,110,78,,couloir_avec_bureaux,88,345,239,,couloir_avec_bureaux,75,625,264
+collines,58,72,50002,,collines,75,70,681,,collines,84,77,1719
+barrieres,74,55,Inf – monopole,,barrieres,82,48,533,,barrieres,216,55,287
+konigsberg,43,1130,33,,konigsberg,38,109,33,,konigsberg,40,98,16
+montagne,405,261,205,,montagne,~1243+2 inf,~776,~370,,montagne,~175 + 2 inf,~7040 + 1 50 000,Inf – monopole
+moulin,23,451,25,,moulin,257,1410,116,,moulin,836,137,135
+couloir_biparti,1969,,,,couloir_biparti,556,,,,couloir_biparti,~2400,,
+,,,,,,,,,,,,,
+rooted weight,,,,,"rooted weight, connectivity^92",,,,,"rooted weight, a-b / (|a+b|^0.5+rows + cols)",,,
+couloir_avec_bureaux,83,186,75,,couloir_avec_bureaux,100,278,70,,couloir_avec_bureaux,102,254,74
+collines,2183,71,422,,collines,59,70,598,,collines,774,68,613
+barrieres,95,61,Inf – goulot,,barrieres,81,57,~2290,,barrieres,121,67,500
+konigsberg,42,88,33,,konigsberg,36,71,31,,konigsberg,42,76,34
+montagne,~297,~436,~832.6,,montagne,~166 + 1 inf,~388,~232,,montagne,~259,~293 + 1 * 16 000,~370
+moulin,106,40,1415,,moulin,106,40,1415,,moulin,257,1100,116
+couloir_biparti,215,,,,couloir_biparti,260,,,,couloir_biparti,556,,
+,,,,,,,,,,,,,
+rooted weight & rooted connectivity,,,,,"rooted weight & connectivity^0,7",,,,,"Idem, 0,85",,,
+couloir_avec_bureaux,Inf – monopole,Inf – monopole,Inf – monopole,,couloir_avec_bureaux,61,456,77,,couloir_avec_bureaux,409,1314,62
+collines,64,77,61,,collines,75,72,64,,collines,84,74,880
+barrieres,595,57,8996,,barrieres,160,45,513,,barrieres,63,47,150
+konigsberg,43,49,37,,konigsberg,34,72,26,,konigsberg,37,70,30
+montagne,~310,~550,~1000,,montagne,~200,~290,~150,,montagne,~175 + 2 inf,~233 + 1 inf,~650 + 3 inf
+moulin,58,199,63,,moulin,202,97,110,,moulin,299,56,76
+couloir_biparti,3559,,,,couloir_biparti,470,,,,couloir_biparti,581,,
+,,,,,,,,,,,,,
+rooted weight & second min,,,,,"rooted weight, a-0.9b",,,,,"rooted weight, a-0.8b",,,
+couloir_avec_bureaux,101,255,92,,couloir_avec_bureaux,78,87,84,,couloir_avec_bureaux,99,99,122
+collines,2027,70,866,,collines,75,70,681,,collines,66,75,67
+barrieres,112,53,48168,,barrieres,56,71,603,,barrieres,75,70,681
+konigsberg,43,79,32,,konigsberg,41,93,34,,konigsberg,41,93,34
+montagne,118,160,155,,montagne,~5650 + 2 inf,99,~204,,montagne,~4158,187,144
+couloir_biparti,,,,,moulin,155,75,277,,moulin,275,150,~1080
+,,,,,couloir_biparti,246,,,,couloir_biparti,21495,,
+"rooted weight, a-0.85b",,,,,,,,,,,,,
+couloir_avec_bureaux,89,94,73,,"rooted weight, a^0.92-0.9b^0.92",,,,,"rooted weight, a^1.1-0.9b^1.1",,,
+collines,74,79,567,,couloir_avec_bureaux,99,503,89,,couloir_avec_bureaux,93,82,93
+barrieres,93,62,8823,,collines,61,70,57,,collines,55,72,688
+konigsberg,40,66,33,,barrieres,264,43,1072,,barrieres,2768,65,3722
+montagne,132,~2275,~676,,konigsberg,44,66,34,,konigsberg,39,50,32
+moulin,~2241,1068,~1121,,montagne,~166,~276,~204,,montagne,106,~804,~304
+couloir_biparti,13020,,,,moulin,237,28,~678,,moulin,~1135,156,49
+,,,,,couloir_biparti,inf,,,,couloir_biparti,1027,,
+"rooted weight, sigma² = 2",,,,,,,,,,,,,
+couloir_avec_bureaux,77,233,57,,"rooted weight, sigma² = 0.5",,,,,,,,
+collines,102,85,673,,couloir_avec_bureaux,97,385,128,,,,,
+barrieres,1002,66,508,,collines,52,48,960,,,,,
+konigsberg,58,119,44,,barrieres,90,54,7144,,,,,
+montagne,184,145,183,,konigsberg,28,59,23,,,,,
+moulin,757,83,702,,montagne,~366,~530,~226,,,,,
+couloir_biparti,303,,,,moulin,1016,192,~723,,,,,
+,,,,,couloir_biparti,inf,,,,,,,
+,,,,,,,,,,,,,
+,,,,,,,,,,,,,
+blinking,moy de 5 iter,,,,,,,,,,,,
+"Blinking 3, thres 10^-3, a-b",,,,,"Blinking 4, thres 10^-3, a-b",,,,,"Blinking 3, thres 10^-3, a-b / (|a+b|^0.5+1)",,,
+couloir_avec_bureaux,87,115,163,,couloir_avec_bureaux,68,77,89,,couloir_avec_bureaux,196,210,216
+collines,59,60,107,,collines,162,70,64,,collines,112,87,185
+barrieres,97,66,15403,,barrieres,322,61,28411,,barrieres,212,199,235
+konigsberg,42,89,33,,konigsberg,42,87,33,,konigsberg,89,82,33
+montagne,~3818,~419,~517,,montagne,152,~369,~123,,montagne,141,84,72
+moulin,16,30,366,,moulin,16,30,366,,moulin,49,69,48
+couloir_biparti,184,,,,couloir_biparti,733,,,,couloir_biparti,30623,,
+,,,,,,,,,,,,,
+"Blinking 3, thres 10^-3, a^0.75-b^0.75",,,,,"Blinking 3, thres 3*10^-3, a^0.75-b^0.75",,,,,"Blinking 3, thres 10^-3, a-b / (|a+b|^0.5+1)","résultats bien trop énormes, abandon (de l’ordre de *10 par rapport à avant)",,
+couloir_avec_bureaux,152,367,53,,couloir_avec_bureaux,103,329,53,,,,,
+collines,86,74,100,,collines,131,75,100,,"Blinking 3, thres 3*10^-3, a^0.75-0.9b^0.75",,,
+barrieres,108,32,204,,barrieres,180,32,199,,couloir_avec_bureaux,87,485,85
+konigsberg,35,65,33,,konigsberg,35,65,33,,collines,65,76,56
+montagne,241,252,373,,montagne,8320,192,10145,,barrieres,131,51,220
+moulin,35,23,150,,moulin,47,23,20,,konigsberg,35,65,31
+couloir_biparti,657,,,,couloir_biparti,2292,,,,montagne,3681,7523,2070
+,,,,,,,,,,moulin,54,36,40
+"Blinking 3, thres 10^-4, a-b",,,,,"Blinking 4, thres 10^-4, a-b",,,,,couloir_biparti,1635,,
+couloir_avec_bureaux,83,186,244,,couloir_avec_bureaux,83,186,202,,,,,
+collines,1099,71,466,,collines,540,71,617,,"Blinking 3, thres 3*10^-4, a^0.7-b^0.7",,,
+barrieres,97,61,37749,,barrieres,104,61,20986,,couloir_avec_bureaux,89,538,52
+konigsberg,42,89,33,,konigsberg,42,87,33,,collines,88,72,78
+montagne,99,513,173,,montagne,,,,,barrieres,122,45,342
+moulin,52,21,979,,moulin,393,244,47,,konigsberg,34,72,26
+couloir_biparti,526,,,,couloir_biparti,353,,,,montagne,256,4177,834
+,,,,,,,,,,moulin,413,19,37
+"Blinking 3, thres 10^-4, a^0.8-b^0.8",,,,,"Blinking 3, thres 3*10^-4, a-b",,,,,couloir_biparti,975,,
+couloir_avec_bureaux,61,569,62,,couloir_avec_bureaux,83,121,115,,,,,
+collines,165,74,63,,collines,232,60,493,,"Blinking 3, thres 10^-3, a^0.7-b^0.7",,,
+barrieres,168,49,184,,barrieres,97,61,11797,,couloir_avec_bureaux,79,576,62
+konigsberg,35,71,33,,konigsberg,42,89,33,,collines,80,72,78
+montagne,271,Inf – goulot,215,,montagne,143,66,236,,barrieres,125,45,303
+moulin,45,19,168,,moulin,29,21,53,,konigsberg,34,67,26
+couloir_biparti,556,,,,couloir_biparti,526,,,,montagne,203,193,354
+,,,,,,,,,,moulin,30,16,15
+"Blinking 3, thres 10^-4, a^0.75-b^0.75",,,,,"Blinking 3, thres 3*10^-4, a^0.8-b^0.8",,,,,couloir_biparti,1019,,
+couloir_avec_bureaux,76,450,53,,couloir_avec_bureaux,61,428,99,,,,,
+collines,512,75,100,,collines,225,74,63,,"Blinking 3, thres 3*10^-3, a^0.7-b^0.7",,,
+barrieres,52,32,319,,barrieres,350,49,345,,couloir_avec_bureaux,85,500,559
+konigsberg,35,65,33,,konigsberg,35,71,33,,collines,88,72,266
+montagne,338,2140,4437,,montagne,3709,214,493,,barrieres,215,58,336
+moulin,540,48,22,,moulin,100,19,153,,konigsberg,33,114,26
+couloir_biparti,466,,,,couloir_biparti,536,,,,montagne,285,11238,1276
+,,,,,,,,,,moulin,52,18,43
+"Blinking 3, thres 10^-3, a^0.75-b^0.75",,,,,"Blinking 3, thres 3*10^-4, a^0.85-b^0.85",,,,,couloir_biparti,1828,,
+couloir_avec_bureaux,90,552,137,,couloir_avec_bureaux,299,597,69,,,,,
+collines,85,72,77,,collines,59,74,133,,"Blinking 4, thres 3*10^-3, a^0.7-b⁰.7",,,
+barrieres,73,51,516,,barrieres,75,47,108,,couloir_avec_bureaux,79,285,81
+konigsberg,36,89,32,,konigsberg,37,70,30,,collines,82,72,63
+montagne,357,1099,264,,montagne,908,1002,1301,,barrieres,164,46,684
+moulin,33,86,17,,moulin,39,173,340,,konigsberg,34,72,26
+couloir_biparti,405,,,,couloir_biparti,163,,,,montagne,2203,5324,307
+,,,,,,,,,,moulin,37,48,25
+,,,,,,,,,,couloir_biparti,105,,
+,,,,,,,,,,,,,
+,,,,,,,,,,"Blinking 4, thres 3*10^-3, a^0.7-b^0.7",,,
+,,,,,,,,,,couloir_avec_bureaux,83,299,53
+,,,,,,,,,,collines,165,74,61
+,,,,,,,,,,barrieres,50,32,227
+,,,,,,,,,,konigsberg,35,75,33
+,,,,,,,,,,montagne,280,256,332
+,,,,,,,,,,moulin,49,22,25
+,,,,,,,,,,couloir_biparti,275,,
