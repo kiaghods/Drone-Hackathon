@@ -1,4 +1,3 @@
-from ast import Return
 import math
 import numpy as np
 import copy
@@ -20,7 +19,7 @@ BLINKING_LAPSE = 10
 BLINKING_THRES = 3*10**-3
 
 def connectivity_function(a,b):
-    return a**0.75-b**0.75
+    return a-b
 
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
@@ -54,6 +53,8 @@ def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
                 A[i, j] = droneNo
     return A, ArrayOfElements, priorities, blinking
 
+#dampening multiplier that will define how much will the iteration be affected by the other ones
+#   It gets smaller as the current E_i gets further away from the min_priorities in the different cells
 @njit(fastmath=True)
 def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size, poids_matrice):
     rows, cols = np.shape(min_priorities)
@@ -64,6 +65,7 @@ def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size
             sum+= poids_matrice[x][y] * math.e**(-(ecart_a_combler**2)) / np.sqrt(2*math.pi)
     return sum/np.sqrt(effective_size)
 
+#How often did the assignation of the cell (x,y) change other the last BLINKING_LAPSE iterations
 def blinking_frequency(blinking, x, y):
     changes = 0
     for i in range(BLINKING_LAPSE):
@@ -99,6 +101,7 @@ def constructBinaryImages(A, robo_start_point, rows, cols):
 
     return BinaryRobot, BinaryNonRobot
 
+#Reconstructing a shortest path through the river found with Djikstra
 def find_back_path(distance_matrix, poids_matrice, x, y):
     rows, cols = np.shape(distance_matrix)
     dist = distance_matrix[x,y]
@@ -134,6 +137,7 @@ def find_back_path(distance_matrix, poids_matrice, x, y):
         u_x, u_y = n_x, n_y
     return list_crossed_tiles
 
+#computes the wights of the river crossing, whether the regions of the different robots are connected, and the penalty associated to non-connexity / river-crossing
 def ConnectedComponentWarpDistance(num_labels, labels_im, poids_matrice, r_position, passage_positions, max_coeff):
     total_weight = 0
     max_weight = -1
@@ -259,6 +263,7 @@ def WarpDistanceToRegion(labels_im, poids_matrice, passage_positions, initial_po
 
     return distances_from_robot
 
+#Utility function to print, for each cell, the different priority values of the different drones
 def printing_metrics(MetricMatrix):
     droneNo, rows, cols = np.shape(MetricMatrix)
     for x in range(rows):
@@ -275,7 +280,7 @@ class DARP:
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.00001, dcells=2,
                  importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step_power = 8,
-                 scale_down = False, output="dump_results.txt", filename =  "no file specified"):
+                 scale_down = False):
                  #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
                  #  they can be seen as "semi-obstacles"
 
@@ -314,8 +319,6 @@ class DARP:
         self.reduction_step = 1-10**(-reduction_step_power)
         self.current_reduction = 1
         self.scale_down = scale_down
-        self.output = output
-        self.output_string = filename
     
 
         print("\nInitial Conditions Defined:")
@@ -547,8 +550,8 @@ class DARP:
 
                 #old_metric = np.zeros((self.droneNo, self.rows, self.cols))
                 for r in range(self.droneNo):
-                    if totalNegPlainErrors != 0:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
+                    if totalNegPlainErrors != 0:
                         if divFairError[r] < 0:
                             correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*derivation_coeff
                         else:
@@ -567,21 +570,21 @@ class DARP:
                             self.generateRandomMatrix(r),
                             self.MetricMatrix[r],
                             ConnectedMultiplierList[r, :, :])
-                #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
-                if self.scale_down and total_iteration % 30 == 0:
-                    for x in range(self.rows):
-                        for y in range(self.cols):
-                            for r in range(self.droneNo):
-                                self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], 0.95)
 
                 total_iteration +=1
                 iteration += 1
                 if total_iteration%30==0:
-                    printing_metrics(self.MetricMatrix)
+                    #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
+                    if self.scale_down:
+                        for x in range(self.rows):
+                            for y in range(self.cols):
+                                for r in range(self.droneNo):
+                                    self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], 0.95)
+                    #printing_metrics(self.MetricMatrix)
                 #we reduce the size of our steps every so often
-                if total_iteration %100 ==0:
+                #if total_iteration %100 ==0:
                 #    print(ConnectedMultiplierList)
-                    print(self.A)
+                #    print(self.A)
                 #    self.current_reduction *= self.reduction_step
                 #    print("current weakening :", self.current_reduction)
                 if self.visualization:
@@ -614,6 +617,7 @@ class DARP:
         RandomMatrix = 2*self.randomLevel*np.random.uniform(0, 1,size=RandomMatrix.shape) + (1 - self.randomLevel)
         for x in range(self.rows):
             for y in range(self.cols):
+                #if this cell is too much blinking, it has a slight chance of being forced to stabilized
                 if blinking_frequency(self.blinking, x, y) > 4 and np.random.uniform(0, 1) < BLINKING_THRES:
                     RandomMatrix[x,y] = 0.5
                     print("blinking in", x, y)
@@ -721,6 +725,7 @@ class DARP:
 
         return returnCrit
 
+    #How much we will penalize which cells, an which degree of influence (dictated by coeff_derivation, the sum of gaussians)
     def CalcConnectedMultiplier(self, rows, cols, dist1, dist2, CCvariation, num_labels, labels_im, r, coeff_derivation):
         returnM = np.zeros((rows, cols))
         MaxV = 0
