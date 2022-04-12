@@ -14,7 +14,8 @@ def readfile (filename):
     file.close()
     return strings_input
 
-def darp_call_file(args, filename, output = "dump.txt"):
+#calls DARP on the said file, with the options precised in args
+def darp_call_file(args, filename):
     strings_input = readfile(filename)
     rows = len(strings_input)
     list_robots = []
@@ -27,6 +28,7 @@ def darp_call_file(args, filename, output = "dump.txt"):
 
     for i in range(rows):
         list_tiles = strings_input[i].split()
+        #check if the input file has the right format
         if len(list_tiles) != cols:
             print('Not the same number of items at every line, line ', i, 'has', len(list_tiles), "columns while the 0-th has", cols, "elements")
             sys.exit(1)
@@ -55,12 +57,13 @@ def darp_call_file(args, filename, output = "dump.txt"):
 
     instance = MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
-                                                passage=list_passage, reduction_step_power=args.slow, scale_down=args.root, output=output, filename = filename)
+                                                passage=list_passage, reduction_step_power=args.slow, scale_down=args.root)
     if instance.DARP_success:
         return instance.iterations
     else:
         return -1
 
+#encapsulation of the darp calls to print an averaged output
 def run_on_file(filename, args, output="dump.txt"):
     output_string = filename
     if args.average == 1:
@@ -89,8 +92,9 @@ def run_on_file(filename, args, output="dump.txt"):
     output_file.close()
     print(output_string)
 
+#Main function. We parse the options, then choose the appropriate behaviour
 if __name__ == '__main__':
-    #We define again the "other" options, the ones that do not directly appear in the grid
+    #We define again the "other" options, the ones that do not directly define the grid
     argparser = argparse.ArgumentParser(
         description=__doc__)
     argparser.add_argument(
@@ -154,6 +158,7 @@ if __name__ == '__main__':
     else:
         output_file = args.tests
         if output_file != None:
+            #We are running all the tests in tests_txt/
             with open(output_file,'w') as f:
                 pass
             print("running tests")
