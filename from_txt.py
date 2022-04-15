@@ -57,7 +57,8 @@ def darp_call_file(args, filename):
 
     instance = MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
-                                                passage=list_passage, reduction_step_power=args.slow, scale_down=args.root)
+                                                passage=list_passage, reduction_step=args.slow, rooting=args.root, gaussian=args.gaussian,
+                                                blinking= args.blinking)
     if instance.DARP_success:
         return instance.iterations
     else:
@@ -130,10 +131,10 @@ if __name__ == '__main__':
         help='time for each iteration to be shown (default: 0.05)')
     argparser.add_argument(
         '-slow',
-        default=8,
+        default=0,
         nargs = '?',
-        type = int,
-        help='the power of 10 by which the gradient step will reduce every 30 iterations (default: 8)')
+        type = float,
+        help='the difference to 1 by which the gradient step size will reduce every 30 iterations (default: none)')
     argparser.add_argument(
         '-root',
         default=False,
@@ -149,6 +150,16 @@ if __name__ == '__main__':
         nargs = '?',
         type = int,
         help='runs darp X times, outputs the average of the iteration numbers (default: 1)')
+    argparser.add_argument(
+        '-gaussian',
+        default=False,
+        action='store_true',
+        help='Apply a reduction to modifications corresponding to a sum of gaussians to the pivotal points (default: False)')
+    argparser.add_argument(
+        '-blinking',
+        default=False,
+        action='store_true',
+        help='blinking cells now have a small chance of stabilizing (default: False)')
     args = argparser.parse_args()
 
     filename = args.file
