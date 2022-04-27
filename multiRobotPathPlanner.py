@@ -300,6 +300,16 @@ if __name__ == '__main__':
         default=False,
         action='store_true',
         help='Apply a reduction to a power < 1 every 30 iterations (default: False)')
+    argparser.add_argument(
+        '-gaussian',
+        default=False,
+        action='store_true',
+        help='Apply a reduction to modifications corresponding to a sum of gaussians to the pivotal points (default: False)')
+    argparser.add_argument(
+        '-blinking',
+        default=False,
+        action='store_true',
+        help='blinking cells now have a small chance of stabilizing (default: False)')
     args = argparser.parse_args()
 
 
@@ -310,4 +320,5 @@ if __name__ == '__main__':
     for i in range(len(args.vtx_wght)):
         poids.append((args.weighted_vtx[i], args.vtx_wght[i]))
 
-    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter, passage=args.pas_pos, reduction_step_power=args.slow)
+    MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter,
+        passage=args.pas_pos, reduction_step_power=args.slow, gaussian=args.gaussian, blinking=args.blinking)

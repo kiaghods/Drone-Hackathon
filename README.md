@@ -112,6 +112,30 @@ python3 multiRobotPathPlanner.py -show timespan
 
 Where timespan is the desired float
 
+* To progressely reduce the weight of the steps of a factor `c`
+
+```
+python3 multiRobotPathPlanner.py -slow c
+```
+
+* To reduce regularly all priorities by a power < 1 precised in the file
+
+```
+python3 multiRobotPathPlanner.py -root
+```
+
+* To add a factor to the steps depending on the distance to the pivots
+
+```
+python3 multiRobotPathPlanner.py -gaussian
+```
+
+* To give contested cells a small chance of stabilizing in favour of a random robot, for a few iterations
+
+```
+python3 multiRobotPathPlanner.py -blinking
+```
+
 * Demo example:
  
 ```
@@ -141,6 +165,16 @@ Such an input can be processed by calling
 python3 from_txt.py -file filename
 ```
 (possibly with options - though not the ones relevant to the different objects' positions)
+
+A few options are also possible when launching the process with `from_txt.py` :
+
+* In order to print the result in `results/filename`, add the option `-results filename`
+
+* In order to run DARP X times and output the average number of iterations, add `-average X`
+
+* In order to run DARP on all the txt files in `tests_txt/`, run `-tests` (mutually exclusive with `file`, which has priority. Compatible with `-confirmation`)
+
+* In order to run DARP on all the txt files in `set_confirmation/`, run `-confirmation` (mutually exclusive with `file`, which has priority. Compatible with `-tests`)
 
 # Results
 
