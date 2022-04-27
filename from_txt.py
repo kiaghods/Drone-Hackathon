@@ -14,6 +14,26 @@ def readfile (filename):
     file.close()
     return strings_input
 
+def clean_output_file(file_input):
+    output_file = "dump.txt"
+    if file_input != None:
+        output_file = file_input
+    output_file = "results/"+output_file
+    with open(output_file,'w') as f:
+                pass
+    return output_file
+
+
+#We are running all the tests in directory_name
+def iterate_runs(directory_name):
+    path = "./" + directory_name
+    list_files = os.listdir(path)
+    list_files.sort()
+    for filename in list_files:
+        if filename.endswith(".txt"):
+            extended_name = directory_name + "/"+filename
+            run_on_file(extended_name, args, output_file)
+
 #calls DARP on the said file, with the options precised in args
 def darp_call_file(args, filename):
     strings_input = readfile(filename)
@@ -141,9 +161,9 @@ if __name__ == '__main__':
         action='store_true',
         help='Apply a reduction to a power < 1 every 30 iterations (default: False)')
     argparser.add_argument(
-        '-tests',
+        '-results',
         type=str,
-        help='applies a standard iteration of tests, with output in the given file')
+        help='will output the results in the given file')
     argparser.add_argument(
         '-average',
         default=1,
@@ -160,26 +180,25 @@ if __name__ == '__main__':
         default=False,
         action='store_true',
         help='blinking cells now have a small chance of stabilizing (default: False)')
+    argparser.add_argument(
+        '-tests',
+        default=False,
+        action='store_true',
+        help='Will run DARP on all the test files (exclusive with -file, which has priority, compatible with -confirmation)')
+    argparser.add_argument(
+        '-confirmation',
+        default=False,
+        action='store_true',
+        help='Will run DARP on all the confirmation files (exclusive with -file, which has priority, compatible with -tests)')
     args = argparser.parse_args()
 
     filename = args.file
+    output_file = clean_output_file(args.results)
     if filename != None:
         print("we run darp on the input", filename)
-        run_on_file(filename, args)
+        run_on_file(filename, args, output_file)
     else:
-        output_file = args.tests
-        if output_file != None:
-            #We are running all the tests in tests_txt/
-            with open(output_file,'w') as f:
-                pass
-            print("running tests")
-            path = "./tests_txt"
-            list_files = os.listdir(path)
-            list_files.sort()
-            for filename in list_files:
-                if filename.endswith(".txt"):
-                    extended_name = "tests_txt/"+filename
-                    run_on_file(extended_name, args, output_file)
-        else:
-            print("no behaviour specified, exiting")
-            sys.exit(9)
+        if args.tests:
+            iterate_runs("tests_txt")
+        if args.confirmation:
+            iterate_runs("set_confirmation")
