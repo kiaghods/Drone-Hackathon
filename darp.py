@@ -17,9 +17,9 @@ np.random.seed(1)
 
 BLINKING_LAPSE = 10
 BLINKING_THRES = 10**-3
-ROOT_REDUCTION = 0.75
+ROOT_REDUCTION = 0.65
 
-def connectivity_function(a,b):
+def connectivity_function(a,b, rows):
     return a-b
 
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
@@ -510,12 +510,17 @@ class DARP:
                 plainErrors = np.zeros((self.droneNo))
                 #same as plainErrors, but reduced by the eventual allowed threshold
                 divFairError = np.zeros((self.droneNo))
-                div_updated_error = np.zeros((self.droneNo))
+
+                derivation_coeff = 1
+                if self.slow_down:
+                    derivation_coeff = self.step_update()
+                step_size = np.full(self.droneNo, derivation_coeff)
 
                 for r in range(self.droneNo):
-                    derivation_coeff = 1
                     if self.gaussian:
-                        derivation_coeff = decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
+                        step_size[r] *= decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
+                    #to avoid issues of priorities becoming negative
+                    step_size[r] = max(1, step_size[r])
 
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
                     ConnectedRobotRegions[r] = True
@@ -528,7 +533,7 @@ class DARP:
                         ConnectedMultiplier, added_weight, connected, used_path_cells = self.CalcConnectedMultiplier(self.rows, self.cols,
                                                                       self.NormalizedEuclideanDistanceBinary(True, BinaryRobot, BinaryNonRobot),
                                                                       self.NormalizedEuclideanDistanceBinary(False, BinaryRobot, BinaryNonRobot),self.CCvariation,
-                                                                      num_labels, labels_im, r, derivation_coeff)
+                                                                      num_labels, labels_im, r, step_size[r])
                         ConnectedRobotRegions[r] = connected
                         self.used_passages[r] = used_path_cells
                     ConnectedMultiplierList[r, :, :] = ConnectedMultiplier
@@ -559,9 +564,9 @@ class DARP:
                         # This conditions seems useless to me : we are adding the ratios plainErrors[r], which are thus always >0
                     if totalNegPlainErrors != 0:
                         if divFairError[r] < 0:
-                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*derivation_coeff
+                            correctionMult[r] = 1 + (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*step_size[r]
                         else:
-                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*self.current_reduction*derivation_coeff
+                            correctionMult[r] = 1 - (plainErrors[r]/totalNegPlainErrors)*(TotalNegPerc/2)*step_size[r]
 
                         criterionMatrix = self.calculateCriterionMatrix(
                                 self.TilesImportance[r],
@@ -586,14 +591,7 @@ class DARP:
                             for y in range(self.cols):
                                 for r in range(self.droneNo):
                                     self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], ROOT_REDUCTION)
-                    if self.slow_down:
-                        self.current_reduction *= self.reduction_step
-                        print("current weakening :", self.current_reduction)
                     #printing_metrics(self.MetricMatrix)
-                #we reduce the size of our steps every so often
-                #if total_iteration %100 ==0:
-                #    print(ConnectedMultiplierList)
-                #    print(self.A)
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
@@ -742,7 +740,7 @@ class DARP:
         for i in range(rows):
             for j in range(cols):
                 a, b = dist1[i, j], dist2[i, j]
-                returnM[i, j] = connectivity_function(a,b)
+                returnM[i, j] = connectivity_function(a,b, rows)
                 if MaxV < returnM[i, j]:
                     MaxV = returnM[i, j]
                 if MinV > returnM[i, j]:
@@ -779,3 +777,7 @@ class DARP:
 
         return distRobot
 
+    def step_update(self):
+        current_step = self.current_reduction + np.random.normal(scale=0.1*self.current_reduction)
+        self.current_reduction *= self.reduction_step
+        return current_step
