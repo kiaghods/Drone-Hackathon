@@ -31,7 +31,7 @@ def iterate_runs(directory_name):
     list_files.sort()
     for filename in list_files:
         if filename.endswith(".txt"):
-            extended_name = directory_name + "/"+filename
+            extended_name = directory_name + filename
             run_on_file(extended_name, args, output_file)
 
 #calls DARP on the said file, with the options precised in args
@@ -182,14 +182,8 @@ if __name__ == '__main__':
         help='blinking cells now have a small chance of stabilizing (default: False)')
     argparser.add_argument(
         '-tests',
-        default=False,
-        action='store_true',
+        type=str,
         help='Will run DARP on all the test files (exclusive with -file, which has priority, compatible with -confirmation)')
-    argparser.add_argument(
-        '-confirmation',
-        default=False,
-        action='store_true',
-        help='Will run DARP on all the confirmation files (exclusive with -file, which has priority, compatible with -tests)')
     args = argparser.parse_args()
 
     filename = args.file
@@ -197,8 +191,6 @@ if __name__ == '__main__':
     if filename != None:
         print("we run darp on the input", filename)
         run_on_file(filename, args, output_file)
-    else:
-        if args.tests:
-            iterate_runs("tests_txt")
-        if args.confirmation:
-            iterate_runs("set_confirmation")
+    elif args.tests != None :
+            iterate_runs(args.tests)
+    
