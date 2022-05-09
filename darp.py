@@ -17,7 +17,7 @@ np.random.seed(1)
 
 BLINKING_LAPSE = 10
 BLINKING_THRES = 10**-3
-ROOT_REDUCTION = 0.65
+ROOT_REDUCTION = 0.75
 
 def connectivity_function(a,b, rows):
     return a-b
@@ -25,7 +25,7 @@ def connectivity_function(a,b, rows):
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
 @njit
-def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
+def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice, blinking_instance, blinking_tab, blinking_frequency):
     blinking = np.full((rows, cols), False)
     priorities = np.zeros((rows, cols))
     ArrayOfElements = np.zeros(droneNo)
@@ -39,9 +39,13 @@ def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice):
                         minV = MetricMatrix[r, i, j]
                         indMin = r
                 weight = poids_matrice[i,j]
-                if indMin != A[i][j]:
-                    blinking[i, j] = True
-                A[i][j] = indMin
+                if blinking_instance:
+                    if indMin != A[i][j]:
+                        blinking[i, j] = True
+                        blinking_frequency[i,j]+=1
+                    if blinking_tab[i,j]:
+                        blinking_frequency[i,j]-=1
+                A[i, j] = indMin
                 priorities[i][j] = minV
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
                 if weight > 0:
@@ -65,14 +69,6 @@ def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size
             ecart_a_combler = min_priorities[x][y] - metric_matrix[x][y]
             sum+= poids_matrice[x][y] * math.e**(-(ecart_a_combler**2)) / np.sqrt(2*math.pi)
     return sum/np.sqrt(effective_size)
-
-#How often did the assignation of the cell (x,y) change other the last BLINKING_LAPSE iterations
-def blinking_frequency(blinking, x, y):
-    changes = 0
-    for i in range(BLINKING_LAPSE):
-        if blinking[i,x,y]:
-            changes +=1
-    return changes
 
 @njit(fastmath=True)
 def inverse_binary_map_as_uint8(BinaryMap):
@@ -302,12 +298,9 @@ class DARP:
 
 
         self.droneNo = len(self.initial_positions)
-        self.passage = False
-        self.PassageNo = 0
+        self.passage = True if (given_passage != []) else False
+        self.PassageNo = len(given_passage)
         self.used_passages = [[] for r in range(self.droneNo)]
-        if given_passage != []:
-            self.passage = True
-            self.passageNo = len(given_passage)
 
         self.visualization = visualization
         self.MaxIter = MaxIter
@@ -328,11 +321,9 @@ class DARP:
         print("\nInitial Conditions Defined:")
         print("Grid Dimensions:", nx, ny)
         print("Number of Robots:", len(self.initial_positions))
-        if self.passage:
-            print("with the presence of an additional false robot")
         print("Initial Robots' positions", self.initial_positions)
-        print("Portions for each Robot:", self.portions)
-        print("maximum number of iterations allowed:", MaxIter, "\n")
+        print("maximum number of iterations allowed:", MaxIter)
+        print("Portions for each Robot:", self.portions, "\n")
 
 
         self.empty_space = []
@@ -346,6 +337,7 @@ class DARP:
                 for i in range(self.cols):
                     self.empty_space.append((j, i))
             self.rows = self.cols
+
 
         self.droneNo = len(self.initial_positions)
         self.A = np.zeros((self.rows, self.cols))
@@ -361,6 +353,7 @@ class DARP:
         self.ArrayOfElements = np.zeros(self.droneNo)
         self.color = []
         self.blinking_tab = np.full((10, self.rows, self.cols), False)
+        self.blinking_frequency = np.zeros((self.rows, self.cols))
 
         if self.dcells ==2: #that is, the default value
             self.dcells = dcells_weight
@@ -376,7 +369,7 @@ class DARP:
         if self.visualization:
             self.assignment_matrix_visualization = darp_area_visualization(self.A, self.droneNo, self.color, self.initial_positions)
 
-    #Checking that no trivial incoherent input has been given
+    #Checking that no trivially incoherent input has been given
     def sanity_check(self, given_initial_positions, given_portions, obs_pos, notEqualPortions, poids, given_passages):
         
         initial_positions = []
@@ -396,20 +389,20 @@ class DARP:
         passage_positions = []
         for (position, weight) in given_passages:
             if position < 0 or position >= self.rows * self.cols:
-                print("Initial positions should be inside the Grid.")
-                sys.exit(1)
+                print("Initial river positions should be inside the Grid.")
+                sys.exit(8)
             passage_positions.append((position // self.cols, position % self.cols, weight))
 
         #Checking similarly that the weights' positions are correct
         poids_positions = []
-        for (cell, weight) in poids:
-            if cell < 0 or obstacle >= self.rows * self.cols:
+        for (position, weight) in poids:
+            if position < 0 or position >= self.rows * self.cols:
                 print("Weighted vertexes should be inside the Grid.")
                 sys.exit(6)
             if weight == 0:
                 print("Weighted vertexes should have non-null weight.")
                 sys.exit(7)
-            poids_positions.append((cell // self.cols, cell%self.cols, weight))
+            poids_positions.append((position // self.cols, position%self.cols, weight))
 
         portions = []
         if notEqualPortions:
@@ -433,6 +426,7 @@ class DARP:
                     print("Initial positions should not be on obstacles")
                     sys.exit(5)
 
+        #iteration can be improved, possibly, through some kind of sorting
         for position in passage_positions:
             for obstacle in obstacles_positions:
                 if position[0] == obstacle[0] and position[1] == obstacle[1]:
@@ -503,15 +497,17 @@ class DARP:
                                                                    self.GridEnv,
                                                                    self.MetricMatrix,
                                                                    self.A,
-                                                                   self.poids_matrice)
-                #here however we only look at the droneNo "true" drones, as we have no connectivity constraint on the false one
+                                                                   self.poids_matrice,
+                                                                   self.blinking,
+                                                                   self.blinking_tab[total_iteration % 10],
+                                                                   self.blinking_frequency)
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
                 plainErrors = np.zeros((self.droneNo))
                 #same as plainErrors, but reduced by the eventual allowed threshold
                 divFairError = np.zeros((self.droneNo))
 
-                derivation_coeff = 1
+                derivation_coeff = 1.
                 if self.slow_down:
                     derivation_coeff = self.step_update()
                 step_size = np.full(self.droneNo, derivation_coeff)
@@ -520,7 +516,7 @@ class DARP:
                     if self.gaussian:
                         step_size[r] *= decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
                     #to avoid issues of priorities becoming negative
-                    step_size[r] = max(1, step_size[r])
+                    step_size[r] = min(1, step_size[r])
 
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
                     ConnectedRobotRegions[r] = True
@@ -584,14 +580,12 @@ class DARP:
 
                 total_iteration +=1
                 iteration += 1
-                if total_iteration%30==0:
-                    #loop to keep values in check : we have no need for values spanning from 1e-50 to 1e+50
-                    if self.rooting:
-                        for x in range(self.rows):
-                            for y in range(self.cols):
-                                for r in range(self.droneNo):
-                                    self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], ROOT_REDUCTION)
-                    #printing_metrics(self.MetricMatrix)
+                if total_iteration%30==0 and self.rooting:
+                    for x in range(self.rows):
+                        for y in range(self.cols):
+                            for r in range(self.droneNo):
+                                self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], ROOT_REDUCTION)
+                #printing_metrics(self.MetricMatrix)
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
@@ -608,14 +602,15 @@ class DARP:
     def getBinaryRobotRegions(self):
         ind = np.where(self.A < self.droneNo)
         temp = (self.A[ind].astype(int),)+ind
-        temp_r, temp_x, temp_y = temp[0].tolist(), temp[1].tolist(), temp[2].tolist()
-        for r in range(self.droneNo):
-            for x,y in self.used_passages[r]:
-                temp_r.append(r)
-                temp_x.append(x)
-                temp_y.append(y)
-        temp_with_rivers = np.asarray(temp_r), np.asarray(temp_x), np.asarray(temp_y)
-        self.BinaryRobotRegions[temp_with_rivers] = True
+        if self.passage:
+            temp_r, temp_x, temp_y = temp[0].tolist(), temp[1].tolist(), temp[2].tolist()
+            for r in range(self.droneNo):
+                for x,y in self.used_passages[r]:
+                    temp_r.append(r)
+                    temp_x.append(x)
+                    temp_y.append(y)
+            temp = np.asarray(temp_r), np.asarray(temp_x), np.asarray(temp_y)
+        self.BinaryRobotRegions[temp] = True
 
     def generateRandomMatrix(self, r):
         RandomMatrix = np.zeros((self.rows, self.cols))
@@ -624,9 +619,8 @@ class DARP:
             for x in range(self.rows):
                 for y in range(self.cols):
                     #if this cell is too much blinking, it has a slight chance of being forced to stabilized
-                    if blinking_frequency(self.blinking_tab, x, y) > 4 and np.random.uniform(0, 1) < BLINKING_THRES:
+                    if self.blinking_frequency[x,y] > 4 and np.random.uniform(0, 1) < BLINKING_THRES:
                         RandomMatrix[x,y] = 0.5
-                        print("blinking in", x, y)
         return RandomMatrix
 
     def FinalUpdateOnMetricMatrix(self, CM, RM, currentOne, CC):
@@ -639,7 +633,6 @@ class DARP:
         for r in range(self.droneNo):
             if np.absolute(self.DesireableAssign[r] - self.ArrayOfElements[r]) > thresh or not connectedRobotRegions[r]:
                 return False
-        #For the fake drone, we do not add any success condition : we just want it to be here to compete with other drones on passage tiles
         return True
 
     def update_connectivity(self):
@@ -648,8 +641,7 @@ class DARP:
             mask = np.where(self.A == i)
             self.connectivity[i, mask[0], mask[1]] = 255
 
-
-    #Defining the distances to robots, as well as the desirable number of tiles for each robot
+    # Construct Assignment Matrix
     def construct_Assignment_Matrix(self):
         Notiles = self.rows*self.cols
         effectiveSize = 0
@@ -664,8 +656,8 @@ class DARP:
                 for y in range(self.rows):
                     if self.GridEnv[x,y] ==-1:
                         weight = self.poids_matrice[x,y]
-                        max_weight = max(max_weight, abs(weight))
-                        min_weight = min(min_weight, abs(weight))
+                        max_weight = max(max_weight, weight)
+                        min_weight = min(min_weight, weight)
                         effectiveSize += weight
                     elif self.GridEnv[x,y]==-2 and self.poids_matrice[x,y] <0:
                         total_passage_weight -= self.poids_matrice[x,y]
@@ -694,7 +686,6 @@ class DARP:
 
         AllDistances = np.zeros((self.droneNo, self.rows, self.cols))
         TilesImportance = np.zeros((self.droneNo, self.rows, self.cols))
-
 
         for x in range(self.rows):
             for y in range(self.cols):
@@ -754,8 +745,9 @@ class DARP:
             for j in range(cols):
                 #in the case of a disconnected component
                 connected_incentive = (returnM[i, j]-MinV)*((2*CCvariation)/(MaxV - MinV)) - CCvariation
+                connected_incentive *= coeff_derivation
                 if connected_incentive>0:
-                    connected_incentive*= coeffs_labels[labels_im[i,j]]*coeff_derivation
+                    connected_incentive*= coeffs_labels[labels_im[i,j]]
                 returnM[i, j] = 1+connected_incentive
 
         return returnM, total_weight, connected, used_path_cells
