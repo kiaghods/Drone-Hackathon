@@ -13,20 +13,20 @@ np.set_printoptions(threshold=sys.maxsize)
 
 random.seed(1)
 os.environ['PYTHONHASHSEED'] = str(1)
-np.random.seed(1)
 
 BLINKING_LAPSE = 10
-BLINKING_THRES = 10**-3
-ROOT_REDUCTION = 0.75
+BLINKING_FREQUENCY = 3*10**-3
+BLINKING_THRESHOLD = 6
+ROOT_REDUCTION = 0.6
 
 def connectivity_function(a,b, rows):
     return a-b
 
 #We create the assignation matrix A, from the distance matrices MetricMatrix[i] = E_i
 #BWlist[i] has value 1 in the cells attributed to the drone i, 0 elsewhere
-@njit
-def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice, blinking_instance, blinking_tab, blinking_frequency):
-    blinking = np.full((rows, cols), False)
+def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice, is_blinking, old_blinking_tab, blinking_frequency):
+    new_blinking_tab = np.full((rows, cols), False)
+    blinking_cells = [[] for _ in range(droneNo)]
     priorities = np.zeros((rows, cols))
     ArrayOfElements = np.zeros(droneNo)
     for i in range(rows):
@@ -39,12 +39,14 @@ def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice, blinkin
                         minV = MetricMatrix[r, i, j]
                         indMin = r
                 weight = poids_matrice[i,j]
-                if blinking_instance:
+                if is_blinking:
                     if indMin != A[i][j]:
-                        blinking[i, j] = True
+                        new_blinking_tab[i, j] = True
                         blinking_frequency[i,j]+=1
-                    if blinking_tab[i,j]:
+                    if old_blinking_tab[i,j]:
                         blinking_frequency[i,j]-=1
+                    if blinking_frequency[i,j]>= BLINKING_THRESHOLD:
+                        blinking_cells[indMin].append((i,j))
                 A[i, j] = indMin
                 priorities[i][j] = minV
                 #ArrayOfElements counts the k_i, now pondered by  the vertices' weights
@@ -56,19 +58,19 @@ def assign(droneNo, rows, cols, GridEnv, MetricMatrix, A, poids_matrice, blinkin
 
             elif GridEnv[i, j] == -2:
                 A[i, j] = droneNo
-    return A, ArrayOfElements, priorities, blinking
+    return A, ArrayOfElements, priorities, new_blinking_tab, blinking_cells
 
 #dampening multiplier that will define how much will the iteration be affected by the other ones
 #   It gets smaller as the current E_i gets further away from the min_priorities in the different cells
 @njit(fastmath=True)
-def decreasing_factor_for_gradient(min_priorities, metric_matrix, effective_size, poids_matrice):
+def decreasing_factor_for_gradient(min_priorities, metric_matrix, poids_matrice):
     rows, cols = np.shape(min_priorities)
     sum = 0
     for x in range(rows):
         for y in range(cols):
             ecart_a_combler = min_priorities[x][y] - metric_matrix[x][y]
             sum+= poids_matrice[x][y] * math.e**(-(ecart_a_combler**2)) / np.sqrt(2*math.pi)
-    return sum/np.sqrt(effective_size)
+    return sum
 
 @njit(fastmath=True)
 def inverse_binary_map_as_uint8(BinaryMap):
@@ -277,7 +279,7 @@ class DARP:
                  visualization, MaxIter=80000, CCvariation=0.01,
                  randomLevel=0.00001, dcells=2,
                  importance=False, poids = [], tps_affichage = 0.05, given_passage = [], reduction_step = 0,
-                 rooting = False, gaussian = False, blinking = False):
+                 rooting = False, gaussian = False, blinking = False, random_seed=1):
                  #given_passage corresponds to the list of tiles that you don't need to explore, but can pass throgh.
                  #  they can be seen as "semi-obstacles"
 
@@ -316,6 +318,7 @@ class DARP:
         self.slow_down = True if reduction_step != 0 else False
         self.gaussian = gaussian
         self.blinking = blinking
+        self.seed = random_seed
     
 
         print("\nInitial Conditions Defined:")
@@ -352,7 +355,7 @@ class DARP:
         self.MetricMatrix = copy.deepcopy(self.AllDistances)
         self.ArrayOfElements = np.zeros(self.droneNo)
         self.color = []
-        self.blinking_tab = np.full((10, self.rows, self.cols), False)
+        self.old_blinking_tab = np.full((10, self.rows, self.cols), False)
         self.blinking_frequency = np.zeros((self.rows, self.cols))
 
         if self.dcells ==2: #that is, the default value
@@ -472,10 +475,13 @@ class DARP:
         return
 
     def divideRegions(self):
+        np.random.seed(self.seed)
         success = False
         cancelled = False
         criterionMatrix = np.zeros((self.rows, self.cols))
         total_iteration = 0
+        #The cells blinking enough to possibly be stabilized
+        blinking_cells = []
 
         #as it is supposed to be defined out of the while loop for the last return
         iteration=0
@@ -491,7 +497,7 @@ class DARP:
             iteration=0
 
             while iteration <= self.MaxIter and not cancelled:
-                self.A, self.ArrayOfElements, self.min_priorities, self.blinking_tab[total_iteration % 10]= assign(self.droneNo,
+                self.A, self.ArrayOfElements, self.min_priorities, self.old_blinking_tab[total_iteration % 10], blinking_cells= assign(self.droneNo,
                                                                    self.rows,
                                                                    self.cols,
                                                                    self.GridEnv,
@@ -499,7 +505,7 @@ class DARP:
                                                                    self.A,
                                                                    self.poids_matrice,
                                                                    self.blinking,
-                                                                   self.blinking_tab[total_iteration % 10],
+                                                                   self.old_blinking_tab[total_iteration % 10],
                                                                    self.blinking_frequency)
                 ConnectedMultiplierList = np.ones((self.droneNo, self.rows, self.cols))
                 ConnectedRobotRegions = np.zeros(self.droneNo)
@@ -512,11 +518,16 @@ class DARP:
                     derivation_coeff = self.step_update()
                 step_size = np.full(self.droneNo, derivation_coeff)
 
+                if self.gaussian:
+                    max_gaussian = 0
+                    for r in range(self.droneNo):
+                        grad_step = decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r], self.poids_matrice)
+                        step_size[r] *= grad_step
+                        max_gaussian = max(max_gaussian, grad_step)
+                    for r in range(self.droneNo):
+                        step_size[r] /= max_gaussian
+
                 for r in range(self.droneNo):
-                    if self.gaussian:
-                        step_size[r] *= decreasing_factor_for_gradient(self.min_priorities, self.MetricMatrix[r],self.effectiveSize, self.poids_matrice)
-                    #to avoid issues of priorities becoming negative
-                    step_size[r] = min(1, step_size[r])
 
                     ConnectedMultiplier = np.ones((self.rows, self.cols))
                     ConnectedRobotRegions[r] = True
@@ -574,7 +585,7 @@ class DARP:
                     #the random matrix only shifts things by a small difference to 1 (per default <= e-4)
                     self.MetricMatrix[r] = self.FinalUpdateOnMetricMatrix(
                             criterionMatrix,
-                            self.generateRandomMatrix(r),
+                            self.generateRandomMatrix(r, blinking_cells),
                             self.MetricMatrix[r],
                             ConnectedMultiplierList[r, :, :])
 
@@ -585,7 +596,9 @@ class DARP:
                         for y in range(self.cols):
                             for r in range(self.droneNo):
                                 self.MetricMatrix[r,x,y] = np.power(self.MetricMatrix[r,x,y], ROOT_REDUCTION)
-                #printing_metrics(self.MetricMatrix)
+                #if total_iteration%1000==0:
+                #    print("iteration :", total_iteration)
+                #    printing_metrics(self.MetricMatrix)
                 if self.visualization:
                     self.assignment_matrix_visualization.placeCells(self.A, iteration_number=iteration)
                     time.sleep(self.tps_affichage)
@@ -612,15 +625,14 @@ class DARP:
             temp = np.asarray(temp_r), np.asarray(temp_x), np.asarray(temp_y)
         self.BinaryRobotRegions[temp] = True
 
-    def generateRandomMatrix(self, r):
+    def generateRandomMatrix(self, r, blinking_cells):
         RandomMatrix = np.zeros((self.rows, self.cols))
         RandomMatrix = 2*self.randomLevel*np.random.uniform(0, 1,size=RandomMatrix.shape) + (1 - self.randomLevel)
         if self.blinking:
-            for x in range(self.rows):
-                for y in range(self.cols):
-                    #if this cell is too much blinking, it has a slight chance of being forced to stabilized
-                    if self.blinking_frequency[x,y] > 4 and np.random.uniform(0, 1) < BLINKING_THRES:
-                        RandomMatrix[x,y] = 0.5
+            for (x,y) in blinking_cells[r]:
+                #if this cell is too much blinking, it has a slight chance of being forced to stabilized
+                if np.random.uniform(0, 1) < BLINKING_FREQUENCY:
+                    RandomMatrix[x,y] = 0.5
         return RandomMatrix
 
     def FinalUpdateOnMetricMatrix(self, CM, RM, currentOne, CC):
