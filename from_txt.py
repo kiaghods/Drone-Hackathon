@@ -1,3 +1,4 @@
+import time
 from black import out
 from numpy import average
 from multiRobotPathPlanner import MultiRobotPathPlanner
@@ -35,7 +36,7 @@ def iterate_runs(directory_name):
             run_on_file(extended_name, args, output_file)
 
 #calls DARP on the said file, with the options precised in args
-def darp_call_file(args, filename):
+def darp_call_file(args, filename, iteration_number):
     strings_input = readfile(filename)
     rows = len(strings_input)
     list_robots = []
@@ -78,7 +79,7 @@ def darp_call_file(args, filename):
     instance = MultiRobotPathPlanner( rows, cols, args.nep, list_robots,  args.portions, list_obstacles, args.vis, 
                                                 list_poids, MaxIter=args.iter, tps_affichage=args.show,
                                                 passage=list_passage, reduction_step=args.slow, rooting=args.root, gaussian=args.gaussian,
-                                                blinking= args.blinking)
+                                                blinking= args.blinking, random_seed = iteration_number)
     if instance.DARP_success:
         return instance.iterations
     else:
@@ -97,7 +98,7 @@ def run_on_file(filename, args, output="dump.txt"):
         total_sum = 0
         nb_infinity = 0
         for i in range(args.average):
-            iter = darp_call_file(args, filename)
+            iter = darp_call_file(args, filename, i+1)
             if iter >=0:
                 total_sum+=iter
             else:
@@ -188,9 +189,12 @@ if __name__ == '__main__':
 
     filename = args.file
     output_file = clean_output_file(args.results)
+    initial_time = time.perf_counter()
     if filename != None:
         print("we run darp on the input", filename)
         run_on_file(filename, args, output_file)
     elif args.tests != None :
             iterate_runs(args.tests)
+    end_time= time.perf_counter()
+    print("temps de calcul :", end_time - initial_time)
     
