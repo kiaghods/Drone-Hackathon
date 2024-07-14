@@ -61,7 +61,7 @@ class MultiRobotPathPlanner(DARP):
 
         start_time = time.time()
         # Initialize DARP
-        self.darp_instance = DARP(nx, ny, notEqualPortions, initial_positions, portions, obs_pos, visualization,
+        self.darp_instance = DARP(nx, ny, notEqualPortions, initial_positions, portions, obs_pos, False,
                                   MaxIter=MaxIter, CCvariation=CCvariation,
                                   randomLevel=randomLevel, dcells=dcells,
                                   importance=importance, poids = poids, tps_affichage= tps_affichage, given_passage=passage,
@@ -321,5 +321,7 @@ if __name__ == '__main__':
     for i in range(len(args.vtx_wght)):
         poids.append((args.weighted_vtx[i], args.vtx_wght[i]))
 
+    reduction_step = 10**(-args.slow)
+
     MultiRobotPathPlanner(args.grid[0], args.grid[1], args.nep, args.in_pos,  args.portions, args.obs_pos, args.vis, poids, MaxIter=args.iter,
-        passage=args.pas_pos, reduction_step_power=args.slow, gaussian=args.gaussian, blinking=args.blinking)
+        passage=args.pas_pos, reduction_step=reduction_step, gaussian=args.gaussian, blinking=args.blinking)
