@@ -1,238 +1,31 @@
-# DARP: Divide Areas Algorithm for Optimal Multi-Robot Coverage Path Planning
+# SearchDestroy
 
-## Motivation
+Multi-drone area-sweep algorithm with online re-planning, built on top of
+[alice-st/DARP-Python](https://github.com/alice-st/DARP-Python) for the
+AGI House Robotics Hackathon (Summer 2024). Placed 2nd.
 
-This project deals with the path planning problem of a team of mobile robots, in order to cover an area of interest, with prior-defined obstacles.
+## What we built
 
-DARP algorithm divides the terrain into a number of equal areas each corresponding to a specific robot, so as to guarantee complete coverage, non-backtracking solution, minimum coverage path, while at the same time does not need any preparatory stage.
+SearchDestroy extends DARP's area-division core with:
 
-### But how does this algorithm work?
+- Efficient parametrization of search regions across multiple drones
+- Online path re-computation when drones are lost or when the environment shifts
+- Robustness heuristics for adversarial interference
+- Physics simulation and visualization via AirSim
 
-In essence, the DARP algorithm follows a cyclic coordinate descent optimization scheme updating each robots’ territory separately but towards achieving the overall mCPP objectives.
+Our hackathon work lives primarily in [`test.ipynb`](test.ipynb), with small
+modifications to `darp.py`, `multiRobotPathPlanner.py`, and `Dependencies.sh`.
 
-<p align="center">
-  <img width="550" height="300" src="images/DARP.png">
-</p>
+## Team
 
+[kiaghods](https://github.com/kiaghods), [Astoria-ni](https://github.com/Astoria-ni), [jerryhan60](https://github.com/jerryhan60), [tigeyshark22](https://github.com/tigeyshark22), [RSDP101](https://github.com/RSDP101), [yanda-dy](https://github.com/yanda-dy)
 
-After the desired area division is achieved, we use Spanning Tree Coverage algorithm to produce the optimal path for each robot, in order to achieve full coverage of the area of interest.
+## Upstream
 
+All core DARP algorithm code is from [alice-st/DARP-Python](https://github.com/alice-st/DARP-Python),
+based on:
 
+> Kapoutsis, Chatzichristofis, Kosmatopoulos. *DARP: Divide Areas Algorithm for Optimal
+> Multi-Robot Coverage Path Planning.* Journal of Intelligent & Robotic Systems.
 
-<p align="center">
-  <img width="650" height="400" src="images/STC.png">
-</p>
-
-
-## Requirements
-
-This project was created using:
-
-* Python version >= 3.6.14
-* OpenCV version >= 4.5.2.54
-* Pygame version >= 2.0.1
-* Scipy version >= 1.7.1
-* nose == 1.3.7 
-
-## Installation and Running
-
-* To install the application, use:
-```
-git clone https://github.com/alice-st/DARP-Python.git
-cd DARP-Python
-./Dependencies.sh DARP
-source DARP/bin/activate
-```
-
-* To run the application, use:
-
-```
-python3 multiRobotPathPlanner.py
-```
-
-## Usage
-* To modify the Grid Dimensions, use:
-```
-python3 multiRobotPathPlanner.py -grid x y
-
-```
-where x, y are the desired rows and columns of the Grid respectively (default: 10, 10).
-
-* To modify the number of Robots and their Initial Positions, use:
-
-```
-python3 multiRobotPathPlanner.py -in_pos a b c
-
-```
-where a, b, c, are the cells' numbers in the Grid (default: 1, 3, 9) (row=0,column=0 --> cell=0, row=0,column=1 --> cell=1 etc.)
-
-* To assign different portions to each Robot (not Equal), use:
-
-```
-python3 multiRobotPathPlanner.py -nep -portions p_a p_b p_c
-
-```
-
-where p_a p_b p_c are the portions assigned to Robots a, b and c respectively. Their sum should be equal to 1. (default: 0.2, 0.3, 0.5)
-
-* To use different positions for the obstacles in the Grid, use:
-
-```
-python3 multiRobotPathPlanner.py -obs_pos o1 o2 o3
-```
-
-where o1 o2 and o3 are the positions of the obstacles in the Grid. Obstacle positions should not overlap with Robots' initial positions. (default: 5, 6, 7) (row=0,column=0 --> cell=0, row=0,column=1 --> cell=1 etc.)
-
-* To visualize the results, use:
-
-```
-python3 multiRobotPathPlanner.py -vis
-```
-
-* To add weights to specific tiles, use
-
-```
-python3 multiRobotPathPlanner.py -weighted_vtx v1 ... vn -vtx_wght w1 ... wn
-```
-
-
-Where v1 to vn are the positions of the weighted vertexes, and w1 ... wn their corresponding weights, as floats.
-
-* To bind a maximum number nb_iter of iteration (default 80 000)
-
-```
-python3 multiRobotPathPlanner.py -iter nb_iter
-```
-
-* To change the time of display of each frame when visualizing
-
-```
-python3 multiRobotPathPlanner.py -show timespan
-```
-
-Where timespan is the desired float
-
-* To progressely reduce the weight of the steps of a factor `c`
-
-```
-python3 multiRobotPathPlanner.py -slow c
-```
-
-* To reduce regularly all priorities by a power < 1 precised in the file
-
-```
-python3 multiRobotPathPlanner.py -root
-```
-
-* To add a factor to the steps depending on the distance to the pivots
-
-```
-python3 multiRobotPathPlanner.py -gaussian
-```
-
-* To give contested cells a small chance of stabilizing in favour of a random robot, for a few iterations
-
-```
-python3 multiRobotPathPlanner.py -blinking
-```
-
-* Demo example:
- 
-```
-python3 multiRobotPathPlanner.py -vis -nep -obs_pos 10 11 12 21 22 23 33 34 35 45 46 47 57 -in_pos 0 99 32 -portions 0.7 0.2 0.1
-```
-
-* To run the Unittests use:
-
-```
-nosetests --nocapture mainUnitTest.py
-```
-
-## Test importation
-
-It is now also possible to import your grid as a txt : it will need to have the following shape
-
-```
-1 1.5 1 # #
-# @ 1 1 @
-# # # 1 1
-1 1 2 1 1
-```
-Where the `@` represent the robots, `#` the obstacles, and the numbers the weighted vertexes (1 being default). Each value in each row needs to be separated by some whitespace, with rows separated by newlines and counting as many elements each.
-
-Such an input can be processed by calling
-```
-python3 from_txt.py -file filename
-```
-(possibly with options - though not the ones relevant to the different objects' positions)
-
-A few options are also possible when launching the process with `from_txt.py` :
-
-* In order to print the result in `results/filename`, add the option `-results filename`
-
-* In order to run DARP X times and output the average number of iterations, add `-average X`
-
-* In order to run DARP on all the txt files in `tests_txt/`, run `-tests` (mutually exclusive with `file`, which has priority. Compatible with `-confirmation`)
-
-* In order to run DARP on all the txt files in `set_confirmation/`, run `-confirmation` (mutually exclusive with `file`, which has priority. Compatible with `-tests`)
-
-# Results
-
-Using a 20*20 Grid area, three robots with initial positions 10, 55 and 174 and Equal portions of the Grid shared between the robots, we obtained the following results:
-
-## Assignment Matrix
-
-<p align="center">
-  <img width="550" height="550" src="images/DARP.gif">
-</p>
-
-## STC paths for each robot, ensuring complete area coverage
-
-### Mode = 0 (connection on bottom between the side of the branches of the MST)
-
-<p align="center">
-  <img width="550" height="550" src="images/mode0.png">
-</p>
-
-### Mode = 1 (connection on top between the side of the branches of the MST)
-
-<p align="center">
-  <img width="550" height="550" src="images/mode1.png">
-</p>
-
-### Mode = 2 (connection on right between the side of the branches of the MST)
-
-<p align="center">
-  <img width="550" height="550" src="images/mode2.png">
-</p>
-
-### Mode = 3 (connection on left between the side of the branches of the MST)
-
-<p align="center">
-  <img width="550" height="550" src="images/mode3.png">
-</p>
-
-# Extra Material
-
-Paper: [Zenodo](https://zenodo.org/record/2591050#.YTCvBVtRVH6)
-
-Medium: [Medium](https://medium.com/@athanasios.kapoutsis/darp-divide-areas-algorithm-for-optimal-multi-robot-coverage-path-planning-2fed77b990a3)
-
-GitHub repositories: [Java](https://github.com/athakapo/DARP)
-
-GUI demo: [YouTube](https://www.youtube.com/watch?v=LrGfvma41Ak)
-
-ROS integration: [Wiki](http://wiki.ros.org/area_division)
-
-
-# Cite as
-
-```
-@article{kapoutsisdarp,
-  title={DARP: Divide Areas Algorithm for Optimal Multi-Robot Coverage Path Planning},
-  author={Kapoutsis, Athanasios Ch and Chatzichristofis, Savvas A and Kosmatopoulos, Elias B},
-  journal={Journal of Intelligent \& Robotic Systems},
-  pages={1--18},
-  publisher={Springer}
-}
-```
+For DARP installation and usage, see the upstream repository.
